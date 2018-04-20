@@ -1,28 +1,28 @@
 PACKAGE = github.com/senseyeio/mbgo
-GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]mock.*' -e '.*[/-]vendor.*')
+GOPACKAGES = $(shell go list ./... | grep -v '.*[/-]vendor.*')
 
-.PHONY: default errcheck fmt lint test tools vet
+.PHONY: default errcheck fmt lint test testshort tools vet
 
 default: errcheck fmt lint test vet
 
 errcheck:
-	@for pkg in $(GOPACKAGES); do errcheck -asserts $$pkg; done
+	errcheck -asserts -verbose $(GOPACKAGES)
 
 fmt:
-	@for pkg in $(GOPACKAGES); do go fmt $$pkg; done
+	@for pkg in $(GOPACKAGES); do go fmt -x $$pkg; done
 
 lint:
-	@for pkg in $(GOPACKAGES); do golint $$pkg; done
+	golint $(GOPACKAGES)
 
 test:
-	@for pkg in $(GOPACKAGES); do go test -cover $$pkg; done
+	go test -v -race -coverprofile=coverage.txt -covermode=atomic $(GOPACKAGES)
 
 testshort:
-	@for pkg in $(GOPACKAGES); do go test -short $$pkg; done
+	go test -v -short $(GOPACKAGES)
 
 tools:
 	go get -u github.com/golang/lint/golint
 	go get -u github.com/kisielk/errcheck
 
 vet:
-	@for pkg in $(GOPACKAGES); do go vet $$pkg; done
+	go vet $(GOPACKAGES)
