@@ -20,7 +20,7 @@ Otherwise the integration tests are ran against a local Docker container running
 
 ## Examples
 
-See the integration tests in `client_test.go` for detailed examples.
+See the examples in the [godoc](https://godoc.org/github.com/senseyeio/mbgo).
 
 ## Contributing
 
