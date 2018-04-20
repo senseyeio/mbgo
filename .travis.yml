@@ -1,3 +1,8 @@
+sudo: required
+
+services:
+    - docker
+
 language: go
 
 go:
@@ -5,7 +10,7 @@ go:
     - 1.7
     - 1.8
     - 1.9
-    - 1.10
+    - "1.10"
     - tip
 
 before_install:
@@ -14,4 +19,5 @@ before_install:
 script:
     - make vet
     - make lint
+    - make errcheck
     - make test
