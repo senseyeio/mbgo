@@ -15,7 +15,10 @@ lint:
 	@for pkg in $(GOPACKAGES); do golint $$pkg; done
 
 test:
-	@for pkg in $(GOPACKAGES); do go test -cover $$pkg; done
+	@for pkg in $(GOPACKAGES); do go test -v -cover -race $$pkg; done
+
+testshort:
+	@for pkg in $(GOPACKAGES); do go test -short $$pkg; done
 
 tools:
 	go get -u github.com/golang/lint/golint
