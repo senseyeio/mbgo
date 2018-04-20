@@ -2,6 +2,7 @@ package mbgo_test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -23,6 +24,15 @@ import (
 var containerURL *url.URL
 
 func TestMain(m *testing.M) {
+	// must parse flags to get -short flag; not parsed before TestMain by default
+	flag.Parse()
+
+	// skip all Docker integration examples in short mode
+	if testing.Short() {
+		log.Printf("skipping integration tests")
+		return
+	}
+
 	cli := mustNewDockerClient()
 	image := "andyrbell/mountebank:1.14.0"
 
