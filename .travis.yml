@@ -6,14 +6,12 @@ services:
 language: go
 
 go:
-    - 1.6
-    - 1.7
-    - 1.8
     - 1.9
     - "1.10"
     - tip
 
 before_install:
+    - docker pull andyrbell/mountebank:1.14.0
     - make tools
 
 script:

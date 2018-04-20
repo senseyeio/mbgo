@@ -1,5 +1,5 @@
 PACKAGE = github.com/senseyeio/mbgo
-GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]mock.*')
+GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]mock.*' -e '.*[/-]vendor.*')
 
 .PHONY: default errcheck fmt lint test tools vet
 
