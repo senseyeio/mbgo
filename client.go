@@ -23,10 +23,11 @@ func NewClient(cli *http.Client, root *url.URL) *Client {
 }
 
 type Imposter struct {
-	Port         int    `json:"port"`
-	Proto        string `json:"protocol"`
-	Name         string `json:"name"`
-	RequestCount int    `json:"numberOfRequests,omitempty"`
+	Port           int    `json:"port"`
+	Proto          string `json:"protocol"`
+	Name           string `json:"name"`
+	RequestCount   int    `json:"numberOfRequests,omitempty"`
+	RecordRequests bool   `json:"recordRequests,omitempty"`
 }
 
 func (cli *Client) Create(imp Imposter) (*Imposter, error) {
