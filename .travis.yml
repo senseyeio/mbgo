@@ -1,0 +1,20 @@
+language: go
+
+go:
+    - 1.6
+    - 1.7
+    - 1.8
+    - 1.9
+    - 1.10
+    - tip
+
+before_install:
+    - make tools
+
+script:
+    - make vet
+    - make lint
+    - make test
+
+after_success:
+    - bash <(curl -s https://codecov.io/bash)
