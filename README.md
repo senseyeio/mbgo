@@ -18,10 +18,6 @@ $ go test -short
 
 Otherwise the integration tests are ran against a local Docker container running mountebank v1.14.0 on port 2525, with additional ports 8080-8083 exposed for imposter fixtures.
 
-## Examples
-
-See the examples in the [godoc](https://godoc.org/github.com/senseyeio/mbgo).
-
 ## Contributing
 
 * Fork the repository.

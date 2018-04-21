@@ -1,3 +1,4 @@
+// Package mbgo implements a mountebank API client.
 package mbgo
 
 import (
@@ -12,14 +13,60 @@ import (
 	"github.com/senseyeio/mbgo/internal/rest"
 )
 
+// Client represents an REST client to the mountebank HTTP API.
 type Client struct {
 	cli *rest.Client
 }
 
+// NewClient returns a new instance of *Client given its underlying
+// HTTP client cli and base URL to the mountebank API root.
 func NewClient(cli *http.Client, root *url.URL) *Client {
 	return &Client{
 		cli: rest.NewClient(cli, root),
 	}
+}
+
+type Request struct {
+	Method string `json:"method"`
+}
+
+// Predicate represents conditional behaviour attached to a Stub
+// in order for it to match an incoming Request. Note that any Stub
+// without Predicates always matches and returns its next Response.
+type Predicate struct {
+	Operator string
+	Request  Request
+}
+
+func (p Predicate) MarshalJSON() ([]byte, error) {
+	m := make(map[string]Request)
+	m[p.Operator] = p.Request
+	return json.Marshal(m)
+}
+
+// Response defines a networked response sent by a Stub whenever an
+// incoming request matches one of its Predicates. Each Response is
+// associated with a type that defines its behaviour. The currently
+// supported types are:
+//	is - Merges the specified Response fields with the defaults.
+//	proxy - Proxies the request to the specified destination and returns the Response.
+//	inject - Creates the Response object based on the injected Javascript.
+type Response struct {
+	StatusCode int               `json:"statusCode"`
+	Headers    map[string]string `json:"headers"`
+	Body       string            `json:"body"`
+}
+
+// Stubs add behaviour to Imposters where a registered Response will be
+// returned if an incoming request matches the registered Predicates.
+//
+// Note that the Responses slice acts as a circular-queue-type structure,
+// where every time the Stub matches an incoming request, the first Response
+// is moved to the end of the slice. This allows for test cases to define and
+// handle a sequence of Responses.
+type Stub struct {
+	Predicates []Predicate `json:"predicate"`
+	Responses  []Response  `json:"responses"`
 }
 
 type Imposter struct {
@@ -30,6 +77,7 @@ type Imposter struct {
 	RecordRequests bool   `json:"recordRequests,omitempty"`
 }
 
+// Create creates a single new Imposter given its description imp.
 func (cli *Client) Create(imp Imposter) (*Imposter, error) {
 	p := "/imposters"
 	b, err := json.Marshal(&imp)

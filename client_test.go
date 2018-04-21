@@ -2,13 +2,13 @@ package mbgo_test
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
-	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -18,293 +18,42 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/senseyeio/mbgo/internal/rest"
 )
 
-// containerURL points to the local mountebank Docker container used in the integration examples.
+// containerURL points to the local mountebank Docker container used in the
+// integration tests. Only available when not testing in short mode.
 var containerURL *url.URL
 
 func TestMain(m *testing.M) {
 	// must parse flags to get -short flag; not parsed before TestMain by default
 	flag.Parse()
 
-	// skip all Docker integration examples in short mode
-	if testing.Short() {
-		log.Printf("skipping integration tests")
-		return
+	var (
+		code int
+		cli  *client.Client
+		id   string
+	)
+
+	if !testing.Short() {
+		cli = mustNewDockerClient()
+		image := "andyrbell/mountebank:1.14.0"
+
+		// create/start a test container, then wait for it to be healthy
+		id, containerURL = mustStartDockerContainer(cli, image)
 	}
 
-	cli := mustNewDockerClient()
-	image := "andyrbell/mountebank:1.14.0"
-
-	// create/start a test container, then wait for it to be healthy
-	id, u := mustStartDockerContainer(cli, image)
-	containerURL = u
-
-	var code int
-	defer func() {
-		if err := recover(); err != nil {
-			log.Printf("test panic caught: %v", err)
-			code = 1
-		}
-
-		// always stop/remove the test container, even on failure
-		mustStopDockerContainer(cli, id, time.Second)
-		os.Exit(code)
-	}()
-
+	// run the main test cases
 	code = m.Run()
-}
 
-func ExampleClient_Create() {
-	mb := newMountebankClient(containerURL)
-
-	imp, err := mb.Create(mbgo.Imposter{
-		Port:  8080,
-		Proto: "http",
-		Name:  "example_create",
-	})
-	if err != nil {
-		panic(err)
+	if !testing.Short() {
+		// Always stop/remove the test container, even on failure.
+		// This function cannot be deferred since program will Exit
+		// before it resolves.
+		mustStopDockerContainer(cli, id, time.Second)
 	}
 
-	fmt.Printf("%d, %s, %s, %d", imp.Port, imp.Proto, imp.Name, imp.RequestCount)
-	// Output: 8080, http, example_create, 0
-}
-
-func ExampleClient_Imposter() {
-	mb := newMountebankClient(containerURL)
-	port := 8081
-
-	// create an imposter fixture prior to retrieval
-	_, err := mb.Create(mbgo.Imposter{
-		Port:  port,
-		Proto: "https",
-		Name:  "example_imposter",
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	imp, err := mb.Imposter(port, false)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%d, %s, %s", imp.Port, imp.Proto, imp.Name)
-	// Output: 8081, https, example_imposter
-}
-
-func ExampleClient_Delete() {
-	mb := newMountebankClient(containerURL)
-	port := 8082
-
-	// create an imposter fixture prior to deletion
-	_, err := mb.Create(mbgo.Imposter{
-		Port:  port,
-		Proto: "tcp",
-		Name:  "example_delete",
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	imp, err := mb.Delete(port, false)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%d, %s, %s", imp.Port, imp.Proto, imp.Name)
-	// Output: 8082, tcp, example_delete
-}
-
-func ExampleClient_DeleteRequests() {
-	mb := newMountebankClient(containerURL)
-	port := 8080
-
-	// delete any previous imposters on the ports under test
-	if _, err := mb.DeleteAll(false); err != nil {
-		panic(err)
-	}
-
-	// create an imposter fixture to record HTTP requests
-	_, err := mb.Create(mbgo.Imposter{
-		Port:           port,
-		Proto:          "http",
-		Name:           "example_delete_requests",
-		RecordRequests: true,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	// make a couple of HTTP requests on the imposter port
-	u := *containerURL
-	host, _, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		panic(err)
-	}
-	u.Host = net.JoinHostPort(host, fmt.Sprintf("%d", port))
-	if _, err = http.Get(u.String()); err != nil {
-		panic(err)
-	}
-	if _, err = http.Get(u.String()); err != nil {
-		panic(err)
-	}
-
-	// verify the requests were recorded, then deleted
-	before, err := mb.Imposter(port, false)
-	if err != nil {
-		panic(err)
-	}
-	after, err := mb.DeleteRequests(port)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%d, %d", before.RequestCount, after.RequestCount)
-	// Output: 2, 0
-}
-
-func ExampleClient_Overwrite() {
-	mb := newMountebankClient(containerURL)
-
-	// delete any previous imposters on the ports under test
-	if _, err := mb.DeleteAll(false); err != nil {
-		panic(err)
-	}
-
-	// create a few imposter fixtures to overwrite later
-	before1, err := mb.Create(mbgo.Imposter{
-		Port:  8080,
-		Proto: "http",
-		Name:  "example_overwrite_before_1",
-	})
-	if err != nil {
-		panic(err)
-	}
-	before2, err := mb.Create(mbgo.Imposter{
-		Port:  8081,
-		Proto: "https",
-		Name:  "example_overwrite_before_2",
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	after, err := mb.Overwrite([]mbgo.Imposter{
-		{
-			Port:  8080,
-			Proto: "tcp",
-			Name:  "example_overwrite_after_1",
-		},
-		{
-			Port:  8081,
-			Proto: "smtp",
-			Name:  "example_overwrite_after_2",
-		},
-	}, false)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("%s, %s, %s, %s",
-		before1.Proto, before2.Proto, after[0].Proto, after[1].Proto)
-	// Output: http, https, tcp, smtp
-}
-
-func ExampleClient_Imposters() {
-	mb := newMountebankClient(containerURL)
-
-	// delete any previous imposters on the ports under test
-	if _, err := mb.DeleteAll(false); err != nil {
-		panic(err)
-	}
-
-	// create a few imposter fixtures to list later
-	_, err := mb.Create(mbgo.Imposter{
-		Port:  8080,
-		Proto: "http",
-		Name:  "example_imposters_1",
-	})
-	if err != nil {
-		panic(err)
-	}
-	_, err = mb.Create(mbgo.Imposter{
-		Port:  8081,
-		Proto: "https",
-		Name:  "example_imposters_2",
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	imps, err := mb.Imposters(true)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%d, %s, %s", len(imps), imps[0].Name, imps[1].Name)
-	// Output: 2, example_imposters_1, example_imposters_2
-}
-
-func ExampleClient_DeleteAll() {
-	mb := newMountebankClient(containerURL)
-
-	// delete any previous imposters on the ports under test
-	if _, err := mb.DeleteAll(false); err != nil {
-		panic(err)
-	}
-
-	// create a few imposter fixtures to delete
-	if _, err := mb.Create(mbgo.Imposter{
-		Port:  8080,
-		Proto: "http",
-		Name:  "example_delete_all_1",
-	}); err != nil {
-		panic(err)
-	}
-	if _, err := mb.Create(mbgo.Imposter{
-		Port:  8081,
-		Proto: "https",
-		Name:  "example_delete_all_2",
-	}); err != nil {
-		panic(err)
-	}
-
-	before, err := mb.Imposters(false)
-	if err != nil {
-		panic(err)
-	}
-	deleted, err := mb.DeleteAll(false)
-	if err != nil {
-		panic(err)
-	}
-	after, err := mb.Imposters(false)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("before: %d, after: %d, deleted: %d", len(before), len(after), len(deleted))
-	// Output: before: 2, after: 0, deleted: 2
-}
-
-func ExampleClient_Config() {
-	mb := newMountebankClient(containerURL)
-
-	cfg, err := mb.Config()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%s, %s", cfg.Version, cfg.Process.NodeVersion)
-	// Output: 1.14.0, v8.9.3
-}
-
-func ExampleClient_Logs() {
-	mb := newMountebankClient(containerURL)
-
-	logs, err := mb.Logs(-1, -1)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("%d", len(logs))
-	// Output: 52
+	os.Exit(code)
 }
 
 // mustNewDockerClient creates a new Docker client instance from
@@ -383,7 +132,7 @@ func mustStartDockerContainer(cli *client.Client, image string) (string, *url.UR
 		if err != nil {
 			panic(err)
 		}
-		// wait for the container to be healthy
+		// block until the container is healthy
 		if !dto.State.Running || dto.State.Health.Status != "healthy" {
 			continue
 		}
@@ -412,9 +161,244 @@ func mustStopDockerContainer(cli *client.Client, id string, timeout time.Duratio
 }
 
 // newMountebankClient creates a new *mbgo.Client instance given its
-// API base URL u; localhost:2525 used in integration examples.
+// API base URL u; localhost:2525 used in integration tests.
 func newMountebankClient(u *url.URL) *mbgo.Client {
 	return mbgo.NewClient(&http.Client{
 		Timeout: time.Second,
 	}, u)
+}
+
+// expectEqual is a helper function used throughout the unit and integration
+// tests to assert deep quality between an actual and expected value.
+func expectEqual(t *testing.T, actual, expected interface{}) {
+	t.Helper()
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("expected %v to equal %v", actual, expected)
+	}
+}
+
+func TestPredicate_MarshalJSON(t *testing.T) {
+	cases := []struct {
+		Description string
+		Predicate   mbgo.Predicate
+		Expected    string
+		Err         error
+	}{
+		{
+			Description: "OperatorEquals",
+			Predicate: mbgo.Predicate{
+				Operator: "equals",
+				Request: mbgo.Request{
+					Method: http.MethodGet,
+				},
+			},
+			Expected: `{"equals":{"method":"GET"}}`,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+
+		t.Run(c.Description, func(t *testing.T) {
+			t.Parallel()
+
+			actual, err := json.Marshal(c.Predicate)
+			expectEqual(t, err, c.Err)
+			expectEqual(t, string(actual), c.Expected)
+		})
+	}
+}
+
+func TestClient_Create(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	mb := newMountebankClient(containerURL)
+
+	cases := []struct {
+		Description string
+		Before      func(*mbgo.Client)
+		After       func(*mbgo.Client)
+		Input       mbgo.Imposter
+		Expected    *mbgo.Imposter
+		Err         error
+	}{
+		{
+			Description: "should error if an invalid port is provided",
+			Input: mbgo.Imposter{
+				Proto: "http",
+				Port:  328473289572983424,
+			},
+			Err: rest.Error{
+				Code:    "bad data",
+				Message: "invalid value for 'port'",
+			},
+		},
+		{
+			Description: "should error if an invalid protocol is provided",
+			Input: mbgo.Imposter{
+				Proto: "udp",
+				Port:  8080,
+			},
+			Err: rest.Error{
+				Code:    "bad data",
+				Message: "the udp protocol is not yet supported",
+			},
+		},
+		{
+			Description: "should create the Imposter if the provided data is valid",
+			Input: mbgo.Imposter{
+				Proto: "http",
+				Port:  8080,
+				Name:  "create_test",
+			},
+			Before: func(mb *mbgo.Client) {
+				_, err := mb.Delete(8080, false)
+				expectEqual(t, err, nil)
+			},
+			After: func(mb *mbgo.Client) {
+				imp, err := mb.Delete(8080, false)
+				expectEqual(t, err, nil)
+				expectEqual(t, imp.Name, "create_test")
+			},
+			Expected: &mbgo.Imposter{
+				Proto: "http",
+				Port:  8080,
+				Name:  "create_test",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(mb)
+			}
+
+			actual, err := mb.Create(c.Input)
+			expectEqual(t, err, c.Err)
+			expectEqual(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(mb)
+			}
+		})
+	}
+}
+
+func TestClient_Imposter(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	mb := newMountebankClient(containerURL)
+
+	cases := []struct {
+		Description string
+		Before      func(*mbgo.Client)
+		After       func(*mbgo.Client)
+		Port        int
+		Replay      bool
+		Expected    *mbgo.Imposter
+		Err         error
+	}{
+		{
+			Description: "should error if an Imposter does not exist on the specified port",
+			Port:        8080,
+			Before: func(mb *mbgo.Client) {
+				_, err := mb.Delete(8080, false)
+				expectEqual(t, err, nil)
+			},
+			Err: rest.Error{
+				Code:    "no such resource",
+				Message: "Try POSTing to /imposters first?",
+			},
+		},
+		{
+			Description: "should return the expected Imposter if it exists on the specified port",
+			Before: func(mb *mbgo.Client) {
+				imp, err := mb.Create(mbgo.Imposter{
+					Port:  8080,
+					Proto: "http",
+					Name:  "imposter_test",
+				})
+				expectEqual(t, err, nil)
+				expectEqual(t, imp.Name, "imposter_test")
+			},
+			After: func(mb *mbgo.Client) {
+				imp, err := mb.Delete(8080, false)
+				expectEqual(t, err, nil)
+				expectEqual(t, imp.Name, "imposter_test")
+			},
+			Port:   8080,
+			Replay: false,
+			Expected: &mbgo.Imposter{
+				Port:  8080,
+				Proto: "http",
+				Name:  "imposter_test",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(mb)
+			}
+
+			actual, err := mb.Imposter(c.Port, c.Replay)
+			expectEqual(t, err, c.Err)
+			expectEqual(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(mb)
+			}
+		})
+	}
+}
+
+func TestClient_Delete(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	mb := newMountebankClient(containerURL)
+
+	cases := []struct {
+		Description string
+		Before      func(*mbgo.Client)
+		After       func(*mbgo.Client)
+		Port        int
+		Replay      bool
+		Expected    *mbgo.Imposter
+		Err         error
+	}{
+		{
+			Description: "should return an empty Imposter struct if one is not configured on the specified port",
+			Port:        8080,
+			Before: func(mb *mbgo.Client) {
+				_, err := mb.Delete(8080, false)
+				expectEqual(t, err, nil)
+			},
+			Expected: &mbgo.Imposter{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(mb)
+			}
+
+			actual, err := mb.Delete(c.Port, c.Replay)
+			expectEqual(t, err, c.Err)
+			expectEqual(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(mb)
+			}
+		})
+	}
 }
