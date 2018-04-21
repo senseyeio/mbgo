@@ -1,5 +1,5 @@
 PACKAGE = github.com/senseyeio/mbgo
-GOPACKAGES = $(shell go list ./... | grep -v '.*[/-]vendor.*')
+GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]vendor.*')
 
 .PHONY: default errcheck fmt lint test testshort tools vet
 
@@ -15,7 +15,7 @@ lint:
 	golint $(GOPACKAGES)
 
 test:
-	go test -v -race -coverprofile=coverage.txt -covermode=atomic $(GOPACKAGES)
+	go test -v $(GOPACKAGES)
 
 testshort:
 	go test -v -short $(GOPACKAGES)
