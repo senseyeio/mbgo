@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,47 +14,338 @@ import (
 	"time"
 
 	"github.com/senseyeio/mbgo"
+	"github.com/senseyeio/mbgo/internal/rest"
 
+	// Docker client dependencies must be vendored in order for
+	// their internal package imports to resolve properly.
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/senseyeio/mbgo/internal/rest"
 )
-
-// containerURL points to the local mountebank Docker container used in the
-// integration tests. Only available when not testing in short mode.
-var containerURL *url.URL
 
 func TestMain(m *testing.M) {
 	// must parse flags to get -short flag; not parsed before TestMain by default
 	flag.Parse()
 
-	var (
-		code int
-		cli  *client.Client
-		id   string
-	)
+	var code int
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("caught test panic: %v", err)
+			code = 1
+		}
+		os.Exit(code)
+	}()
 
 	if !testing.Short() {
-		cli = mustNewDockerClient()
+		ctx := context.Background()
+		cli := mustNewDockerClient()
 		image := "andyrbell/mountebank:1.14.0"
 
-		// create/start a test container, then wait for it to be healthy
-		id, containerURL = mustStartDockerContainer(cli, image)
+		var (
+			id  string
+			err error
+		)
+
+		// setup a mountebank Docker container for integration tests
+		if err = pullDockerImage(ctx, cli, image, time.Second*45); err != nil {
+			panic(err)
+		}
+		id, err = createDockerContainer(ctx, cli, image, time.Second*5)
+		if err != nil {
+			panic(err)
+		}
+		if err = startDockerContainer(ctx, cli, id, time.Second*3); err != nil {
+			panic(err)
+		}
+		if err = waitHealthyDockerContainer(ctx, cli, id, time.Second*10); err != nil {
+			panic(err)
+		}
+
+		// Always stop/remove the test container, even on test failure or panic.
+		defer func() {
+			if err = stopDockerContainer(ctx, cli, id, time.Second*3); err != nil {
+				panic(err)
+			}
+			if err = removeDockerContainer(ctx, cli, id, time.Second*3); err != nil {
+				panic(err)
+			}
+		}()
 	}
 
 	// run the main test cases
 	code = m.Run()
+}
 
-	if !testing.Short() {
-		// Always stop/remove the test container, even on failure.
-		// This function cannot be deferred since program will Exit
-		// before it resolves.
-		mustStopDockerContainer(cli, id, time.Second)
+// expectEqual is a helper function used throughout the unit and integration
+// tests to assert deep quality between an actual and expected value.
+func expectEqual(t *testing.T, actual, expected interface{}) {
+	t.Helper()
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("\nexpected:\n\t%+v\nto equal:\n\t%+v\n", actual, expected)
+	}
+}
+
+func TestImposter_MarshalJSON(t *testing.T) {
+	cases := []struct {
+		Description string
+		Imposter    mbgo.Imposter
+		Expected    map[string]interface{}
+		Err         error
+	}{
+		{
+			Description: "should marshal into the expected JSON structure when stubbing TCP",
+			Imposter: mbgo.Imposter{
+				Port:           8080,
+				Proto:          "tcp",
+				Name:           "tcp_imposter",
+				RecordRequests: true,
+				AllowCORS:      true,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "equals",
+								Request: &mbgo.TCPRequest{
+									RequestFrom: &net.TCPAddr{
+										IP:   net.IPv4(172, 17, 0, 1),
+										Port: 58112,
+									},
+									Data: "SGVsbG8sIHdvcmxkIQ==",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: &mbgo.TCPResponse{
+									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+								},
+							},
+						},
+					},
+				},
+			},
+			Expected: map[string]interface{}{
+				"port":           float64(8080),
+				"protocol":       "tcp",
+				"name":           "tcp_imposter",
+				"recordRequests": true,
+				"allowCORS":      true,
+				"stubs": []interface{}{
+					map[string]interface{}{
+						"predicates": []interface{}{
+							map[string]interface{}{
+								"equals": map[string]interface{}{
+									"data":        "SGVsbG8sIHdvcmxkIQ==",
+									"requestFrom": "172.17.0.1:58112",
+								},
+							},
+						},
+						"responses": []interface{}{
+							map[string]interface{}{
+								"is": map[string]interface{}{
+									"data": "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	os.Exit(code)
+	for _, c := range cases {
+		c := c
+
+		t.Run(c.Description, func(t *testing.T) {
+			t.Parallel()
+
+			b, err := json.Marshal(c.Imposter)
+			expectEqual(t, err, c.Err)
+
+			actual := make(map[string]interface{})
+			if err := json.Unmarshal(b, &actual); err != nil {
+				t.Fatal(err)
+			}
+			for key := range actual {
+				expectEqual(t, actual[key], c.Expected[key])
+			}
+		})
+	}
+}
+
+func TestImposter_UnmarshalJSON(t *testing.T) {
+	cases := []struct {
+		Description string
+		JSON        map[string]interface{}
+		Expected    mbgo.Imposter
+		Err         error
+	}{
+		{
+			Description: "should unmarshal into the expected structure when given the JSON for an HTTP Imposter",
+			JSON: map[string]interface{}{
+				"port":             8080,
+				"protocol":         "http",
+				"name":             "http_imposter",
+				"numberOfRequests": 42,
+				"stubs": []interface{}{
+					map[string]interface{}{
+						"predicates": []interface{}{
+							map[string]interface{}{
+								"equals": map[string]interface{}{
+									"requestFrom": "172.17.0.1:58112",
+									"method":      "POST",
+									"path":        "/foo",
+									"query": map[string]string{
+										"bar": "baz",
+									},
+									"headers": map[string]string{
+										"Content-Type": "application/json",
+									},
+									"body": `{"predicate":true}`,
+								},
+							},
+						},
+						"responses": []interface{}{
+							map[string]interface{}{
+								"is": map[string]interface{}{
+									"statusCode": 200,
+									"_mode":      "text",
+									"headers": map[string]string{
+										"Accept":       "application/json",
+										"Content-Type": "application/json",
+									},
+									"body": `{"response":true}`,
+								},
+							},
+						},
+					},
+				},
+			},
+			Expected: mbgo.Imposter{
+				Port:         8080,
+				Proto:        "http",
+				Name:         "http_imposter",
+				RequestCount: 42,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "equals",
+								Request: mbgo.HTTPRequest{
+									RequestFrom: &net.TCPAddr{
+										IP:   net.IPv4(172, 17, 0, 1),
+										Port: 58112,
+									},
+									Method: "POST",
+									Path:   "/foo",
+									Query: map[string]string{
+										"bar": "baz",
+									},
+									Headers: map[string]string{
+										"Content-Type": "application/json",
+									},
+									Body: `{"predicate":true}`,
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+									Mode:       "text",
+									Headers: map[string]string{
+										"Accept":       "application/json",
+										"Content-Type": "application/json",
+									},
+									Body: `{"response":true}`,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Description: "should unmarshal into the expected structure when given the JSON for a TCP Imposter",
+			JSON: map[string]interface{}{
+				"port":             8080,
+				"protocol":         "tcp",
+				"name":             "tcp_imposter",
+				"numberOfRequests": 4,
+				"stubs": []interface{}{
+					map[string]interface{}{
+						"predicates": []interface{}{
+							map[string]interface{}{
+								"equals": map[string]interface{}{
+									"requestFrom": "172.17.0.1:58112",
+									"data":        "SGVsbG8sIHdvcmxkIQ==",
+								},
+							},
+						},
+						"responses": []interface{}{
+							map[string]interface{}{
+								"is": map[string]interface{}{
+									"data": "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+								},
+							},
+						},
+					},
+				},
+			},
+			Expected: mbgo.Imposter{
+				Port:         8080,
+				Proto:        "tcp",
+				Name:         "tcp_imposter",
+				RequestCount: 4,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "equals",
+								Request: mbgo.TCPRequest{
+									RequestFrom: &net.TCPAddr{
+										IP:   net.IPv4(172, 17, 0, 1),
+										Port: 58112,
+									},
+									Data: "SGVsbG8sIHdvcmxkIQ==",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+
+		t.Run(c.Description, func(t *testing.T) {
+			t.Parallel()
+
+			b, err := json.Marshal(c.JSON)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			actual := mbgo.Imposter{}
+			err = json.Unmarshal(b, &actual)
+			expectEqual(t, err, c.Err)
+			expectEqual(t, actual, c.Expected)
+		})
+	}
 }
 
 // mustNewDockerClient creates a new Docker client instance from
@@ -71,18 +363,17 @@ func mustNewDockerClient() *client.Client {
 	return cli
 }
 
-// mustStartDockerContainer pulls the mountebank image, creates and
-// starts the container, then waits for it to be healthy.
-//
-// The container exposes port 2525 for the mountebank API and the port
-// range 8080-8084 to be used by imposter fixtures of the http, https,
-// tcp and smtp protocols, respectively.
-func mustStartDockerContainer(cli *client.Client, image string) (string, *url.URL) {
-	ctx := context.Background()
-	_, err := cli.ImagePull(ctx, image, types.ImagePullOptions{})
-	if err != nil {
-		panic(err)
-	}
+func pullDockerImage(ctx context.Context, cli *client.Client, name string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	_, err := cli.ImagePull(ctx, name, types.ImagePullOptions{})
+	return err
+}
+
+func createDockerContainer(ctx context.Context, cli *client.Client, image string, timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: image,
@@ -120,44 +411,50 @@ func mustStartDockerContainer(cli *client.Client, image string) (string, *url.UR
 		},
 	}, nil, "mbgo_integration_test")
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		panic(err)
-	}
-
-	for {
-		dto, err := cli.ContainerInspect(ctx, resp.ID)
-		if err != nil {
-			panic(err)
-		}
-		// block until the container is healthy
-		if !dto.State.Running || dto.State.Health.Status != "healthy" {
-			continue
-		}
-		time.Sleep(time.Millisecond * 100)
-		break
-	}
-
-	return resp.ID, &url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort("0.0.0.0", "2525"),
-	}
+	return resp.ID, nil
 }
 
-// mustStopDockerContainer stops and removes the Docker container
-// specified by the given id.
-func mustStopDockerContainer(cli *client.Client, id string, timeout time.Duration) {
-	ctx := context.Background()
+func startDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
-	if err := cli.ContainerStop(ctx, id, &timeout); err != nil {
-		panic(err)
-	}
+	return cli.ContainerStart(ctx, id, types.ContainerStartOptions{})
+}
 
-	if err := cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{}); err != nil {
-		panic(err)
+func waitHealthyDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for {
+		dto, err := cli.ContainerInspect(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		// block until the container is healthy
+		if !dto.State.Running || dto.State.Health.Status != "healthy" {
+			time.Sleep(time.Millisecond * 100)
+			continue
+		}
+		break
 	}
+	return nil
+}
+
+func stopDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return cli.ContainerStop(ctx, id, &timeout)
+}
+
+func removeDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{})
 }
 
 // newMountebankClient creates a new *mbgo.Client instance given its
@@ -168,54 +465,12 @@ func newMountebankClient(u *url.URL) *mbgo.Client {
 	}, u)
 }
 
-// expectEqual is a helper function used throughout the unit and integration
-// tests to assert deep quality between an actual and expected value.
-func expectEqual(t *testing.T, actual, expected interface{}) {
-	t.Helper()
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("expected %v to equal %v", actual, expected)
-	}
-}
-
-func TestPredicate_MarshalJSON(t *testing.T) {
-	cases := []struct {
-		Description string
-		Predicate   mbgo.Predicate
-		Expected    string
-		Err         error
-	}{
-		{
-			Description: "OperatorEquals",
-			Predicate: mbgo.Predicate{
-				Operator: "equals",
-				Request: mbgo.Request{
-					Method: http.MethodGet,
-				},
-			},
-			Expected: `{"equals":{"method":"GET"}}`,
-		},
-	}
-
-	for _, c := range cases {
-		c := c
-
-		t.Run(c.Description, func(t *testing.T) {
-			t.Parallel()
-
-			actual, err := json.Marshal(c.Predicate)
-			expectEqual(t, err, c.Err)
-			expectEqual(t, string(actual), c.Expected)
-		})
-	}
-}
-
 func TestClient_Create(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
 
-	mb := newMountebankClient(containerURL)
+	mb := newMountebankClient(nil)
 
 	cases := []struct {
 		Description string
@@ -248,11 +503,44 @@ func TestClient_Create(t *testing.T) {
 			},
 		},
 		{
-			Description: "should create the Imposter if the provided data is valid",
+			Description: "should create the expected HTTP Imposter on success",
 			Input: mbgo.Imposter{
-				Proto: "http",
-				Port:  8080,
-				Name:  "create_test",
+				Proto:          "http",
+				Port:           8080,
+				Name:           "create_test",
+				RecordRequests: true,
+				AllowCORS:      true,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "equals",
+								Request: mbgo.HTTPRequest{
+									Method: http.MethodGet,
+									Path:   "/foo",
+									Query: map[string]string{
+										"page": "3",
+									},
+									Headers: map[string]string{
+										"Accept": "application/json",
+									},
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+									Headers: map[string]string{
+										"Content-Type": "application/json",
+									},
+									Body: `{"test":true}`,
+								},
+							},
+						},
+					},
+				},
 			},
 			Before: func(mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
@@ -264,9 +552,43 @@ func TestClient_Create(t *testing.T) {
 				expectEqual(t, imp.Name, "create_test")
 			},
 			Expected: &mbgo.Imposter{
-				Proto: "http",
-				Port:  8080,
-				Name:  "create_test",
+				Proto:          "http",
+				Port:           8080,
+				Name:           "create_test",
+				RecordRequests: true,
+				AllowCORS:      true,
+				RequestCount:   0,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "equals",
+								Request: mbgo.HTTPRequest{
+									Method: http.MethodGet,
+									Path:   "/foo",
+									Query: map[string]string{
+										"page": "3",
+									},
+									Headers: map[string]string{
+										"Accept": "application/json",
+									},
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+									Headers: map[string]string{
+										"Content-Type": "application/json",
+									},
+									Body: `{"test":true}`,
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -293,7 +615,7 @@ func TestClient_Imposter(t *testing.T) {
 		t.Skip()
 	}
 
-	mb := newMountebankClient(containerURL)
+	mb := newMountebankClient(nil)
 
 	cases := []struct {
 		Description string
@@ -317,27 +639,73 @@ func TestClient_Imposter(t *testing.T) {
 			},
 		},
 		{
-			Description: "should return the expected Imposter if it exists on the specified port",
+			Description: "should return the expected TCP Imposter if it exists on the specified port",
 			Before: func(mb *mbgo.Client) {
+				_, err := mb.Delete(8081, false)
+				expectEqual(t, err, nil)
+
 				imp, err := mb.Create(mbgo.Imposter{
-					Port:  8080,
-					Proto: "http",
-					Name:  "imposter_test",
+					Port:           8081,
+					Proto:          "tcp",
+					Name:           "imposter_test",
+					RecordRequests: true,
+					Stubs: []mbgo.Stub{
+						{
+							Predicates: []mbgo.Predicate{
+								{
+									Operator: "endsWith",
+									Request: mbgo.TCPRequest{
+										Data: "SGVsbG8sIHdvcmxkIQ==",
+									},
+								},
+							},
+							Responses: []mbgo.Response{
+								{
+									Type: "is",
+									Value: mbgo.TCPResponse{
+										Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+									},
+								},
+							},
+						},
+					},
 				})
 				expectEqual(t, err, nil)
 				expectEqual(t, imp.Name, "imposter_test")
 			},
 			After: func(mb *mbgo.Client) {
-				imp, err := mb.Delete(8080, false)
+				imp, err := mb.Delete(8081, false)
 				expectEqual(t, err, nil)
 				expectEqual(t, imp.Name, "imposter_test")
 			},
-			Port:   8080,
+			Port:   8081,
 			Replay: false,
 			Expected: &mbgo.Imposter{
-				Port:  8080,
-				Proto: "http",
-				Name:  "imposter_test",
+				Port:           8081,
+				Proto:          "tcp",
+				Name:           "imposter_test",
+				RecordRequests: false, // this field is only used for creation
+				RequestCount:   0,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "endsWith",
+								Request: mbgo.TCPRequest{
+									Data: "SGVsbG8sIHdvcmxkIQ==",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -364,7 +732,7 @@ func TestClient_Delete(t *testing.T) {
 		t.Skip()
 	}
 
-	mb := newMountebankClient(containerURL)
+	mb := newMountebankClient(nil)
 
 	cases := []struct {
 		Description string
