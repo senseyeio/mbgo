@@ -1,4 +1,3 @@
-PACKAGE = github.com/senseyeio/mbgo
 GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]vendor.*')
 
 .PHONY: default errcheck fmt lint test testshort tools vet
@@ -6,19 +5,19 @@ GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]vendor.*')
 default: errcheck fmt lint test vet
 
 errcheck:
-	errcheck -asserts -verbose $(GOPACKAGES)
+	errcheck -asserts $(GOPACKAGES)
 
 fmt:
 	@for pkg in $(GOPACKAGES); do go fmt -x $$pkg; done
 
 lint:
-	golint $(GOPACKAGES)
+	golint -set_exit_status $(GOPACKAGES)
 
 test:
-	go test -v $(GOPACKAGES)
+	go test -cover $(GOPACKAGES)
 
 testshort:
-	go test -v -short $(GOPACKAGES)
+	go test -short $(GOPACKAGES)
 
 tools:
 	go get -u github.com/golang/lint/golint
