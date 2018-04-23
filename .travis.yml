@@ -12,10 +12,7 @@ go:
 
 before_install:
     - docker pull andyrbell/mountebank:1.14.0
-    - make tools
 
 script:
     - make vet
-    - make lint
-    - make errcheck
     - make test
