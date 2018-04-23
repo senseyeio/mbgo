@@ -20,7 +20,7 @@ testshort:
 	go test -short $(GOPACKAGES)
 
 tools:
-	go get -u github.com/golang/lint/golint
+	go get -u golang.org/x/lint/golint
 	go get -u github.com/kisielk/errcheck
 
 vet:
