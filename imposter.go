@@ -1,7 +1,6 @@
 package mbgo
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"net"
@@ -200,9 +199,7 @@ func (dto predicateDTO) unmarshalProto(proto string) (p Predicate, err error) {
 		switch proto {
 		case "http":
 			r := httpRequestDTO{}
-			dec := json.NewDecoder(bytes.NewReader(b))
-			dec.DisallowUnknownFields()
-			if err = dec.Decode(&r); err != nil {
+			if err = json.Unmarshal(b, &r); err != nil {
 				return
 			}
 			var addr net.Addr
@@ -223,9 +220,7 @@ func (dto predicateDTO) unmarshalProto(proto string) (p Predicate, err error) {
 
 		case "tcp":
 			r := tcpRequestDTO{}
-			dec := json.NewDecoder(bytes.NewReader(b))
-			dec.DisallowUnknownFields()
-			if err = dec.Decode(&r); err != nil {
+			if err = json.Unmarshal(b, &r); err != nil {
 				return
 			}
 			var addr net.Addr
@@ -306,10 +301,7 @@ func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 		switch proto {
 		case "http":
 			r := httpResponseDTO{}
-			dec := json.NewDecoder(bytes.NewReader(b))
-			dec.DisallowUnknownFields()
-
-			if err = dec.Decode(&r); err != nil {
+			if err = json.Unmarshal(b, &r); err != nil {
 				return
 			}
 			resp.Value = HTTPResponse{
@@ -321,10 +313,7 @@ func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 
 		case "tcp":
 			r := tcpResponseDTO{}
-			dec := json.NewDecoder(bytes.NewReader(b))
-			dec.DisallowUnknownFields()
-
-			if err = dec.Decode(&r); err != nil {
+			if err = json.Unmarshal(b, &r); err != nil {
 				return
 			}
 			resp.Value = TCPResponse{
