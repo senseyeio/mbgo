@@ -17,11 +17,11 @@ func TestImposter_MarshalJSON(t *testing.T) {
 		Err         error
 	}{
 		{
-			Description: "should marshal into the expected JSON structure when stubbing TCP",
+			Description: "should marshal the tcp Imposter into the expected JSON",
 			Imposter: mbgo.Imposter{
 				Port:           8080,
 				Proto:          "tcp",
-				Name:           "tcp_imposter",
+				Name:           "tcp_test_imposter",
 				RecordRequests: true,
 				AllowCORS:      true,
 				Stubs: []mbgo.Stub{
@@ -41,7 +41,7 @@ func TestImposter_MarshalJSON(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: &mbgo.TCPResponse{
+								Value: mbgo.TCPResponse{
 									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
 								},
 							},
@@ -50,9 +50,9 @@ func TestImposter_MarshalJSON(t *testing.T) {
 				},
 			},
 			Expected: map[string]interface{}{
-				"port":           float64(8080),
+				"port":           8080,
 				"protocol":       "tcp",
-				"name":           "tcp_imposter",
+				"name":           "tcp_test_imposter",
 				"recordRequests": true,
 				"allowCORS":      true,
 				"stubs": []interface{}{
@@ -76,6 +76,88 @@ func TestImposter_MarshalJSON(t *testing.T) {
 				},
 			},
 		},
+		{
+			Description: "should marshal the http Imposter into the expected JSON",
+			Imposter: mbgo.Imposter{
+				Port:           8080,
+				Proto:          "http",
+				Name:           "http_test_imposter",
+				RecordRequests: true,
+				AllowCORS:      true,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "equals",
+								Request: mbgo.HTTPRequest{
+									RequestFrom: &net.TCPAddr{
+										IP:   net.IPv4(172, 17, 0, 1),
+										Port: 58112,
+									},
+									Method: http.MethodGet,
+									Path:   "/foo",
+									Query: map[string]string{
+										"page": "3",
+									},
+									Headers: map[string]string{
+										"Accept": "application/json",
+									},
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+									Headers: map[string]string{
+										"Content-Type": "application/json",
+									},
+									Body: `{"test":true}`,
+								},
+							},
+						},
+					},
+				},
+			},
+			Expected: map[string]interface{}{
+				"port":           8080,
+				"protocol":       "http",
+				"name":           "http_test_imposter",
+				"recordRequests": true,
+				"allowCORS":      true,
+				"stubs": []interface{}{
+					map[string]interface{}{
+						"predicates": []interface{}{
+							map[string]interface{}{
+								"equals": map[string]interface{}{
+									"requestFrom": "172.17.0.1:58112",
+									"method":      http.MethodGet,
+									"path":        "/foo",
+									"query": map[string]string{
+										"page": "3",
+									},
+									"headers": map[string]string{
+										"Accept": "application/json",
+									},
+								},
+							},
+						},
+						"responses": []interface{}{
+							map[string]interface{}{
+								"is": map[string]interface{}{
+									"statusCode": 200,
+									"headers": map[string]string{
+										"Content-Type": "application/json",
+									},
+									"body": `{"test":true}`,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -84,16 +166,17 @@ func TestImposter_MarshalJSON(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			t.Parallel()
 
-			b, err := json.Marshal(c.Imposter)
+			ab, err := json.Marshal(c.Imposter)
 			expectEqual(t, err, c.Err)
+			eb, err := json.Marshal(c.Expected)
+			expectEqual(t, err, nil)
 
-			actual := make(map[string]interface{})
-			if err := json.Unmarshal(b, &actual); err != nil {
-				t.Fatal(err)
-			}
-			for key := range actual {
-				expectEqual(t, actual[key], c.Expected[key])
-			}
+			var actual, expected map[string]interface{}
+			// these calls cannot fail
+			_ = json.Unmarshal(ab, &actual)
+			_ = json.Unmarshal(eb, &expected)
+
+			expectEqual(t, actual, expected)
 		})
 	}
 }
@@ -106,7 +189,7 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 		Err         error
 	}{
 		{
-			Description: "should unmarshal into the expected structure when given the JSON for an HTTP Imposter",
+			Description: "should unmarshal the JSON into the expected http Imposter",
 			JSON: map[string]interface{}{
 				"port":             8080,
 				"protocol":         "http",
@@ -192,7 +275,7 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 			},
 		},
 		{
-			Description: "should unmarshal into the expected structure when given the JSON for a TCP Imposter",
+			Description: "should unmarshal the JSON into the expected tcp Imposter",
 			JSON: map[string]interface{}{
 				"port":             8080,
 				"protocol":         "tcp",
