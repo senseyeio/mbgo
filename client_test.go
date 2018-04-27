@@ -384,8 +384,6 @@ func TestClient_Delete(t *testing.T) {
 // expectEqual is a helper function used throughout the unit and integration
 // tests to assert deep quality between an actual and expected value.
 func expectEqual(t *testing.T, actual, expected interface{}) {
-	t.Helper()
-
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("\nexpected:\n\t%+v\nto equal:\n\t%+v\n", actual, expected)
 	}
