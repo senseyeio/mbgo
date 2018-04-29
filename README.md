@@ -1,6 +1,6 @@
 # mbgo
 
-[![GoDoc](https://godoc.org/github.com/senseyeio/mbgo?status.svg)](https://godoc.org/github.com/senseyeio/mbgo) [![Build Status](https://travis-ci.org/senseyeio/mbgo.svg?branch=master)](https://travis-ci.org/senseyeio/mbgo)
+[![GoDoc](https://godoc.org/github.com/senseyeio/mbgo?status.svg)](https://godoc.org/github.com/senseyeio/mbgo) [![Build Status](https://travis-ci.org/senseyeio/mbgo.svg?branch=master)](https://travis-ci.org/senseyeio/mbgo) [![Go Report Card](https://goreportcard.com/badge/github.com/senseyeio/mbgo)](https://goreportcard.com/report/github.com/senseyeio/mbgo)
 
 A mountebank API client for the Go programming language.
 
