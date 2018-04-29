@@ -2,6 +2,7 @@ package mbgo_test
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/senseyeio/mbgo"
-	"github.com/senseyeio/mbgo/internal/rest"
 
 	// Docker client dependencies must be vendored in order for
 	// their internal package imports to resolve properly.
@@ -96,10 +96,7 @@ func TestClient_Create(t *testing.T) {
 				Proto: "http",
 				Port:  328473289572983424,
 			},
-			Err: rest.Error{
-				Code:    "bad data",
-				Message: "invalid value for 'port'",
-			},
+			Err: errors.New("bad data: invalid value for 'port'"),
 		},
 		{
 			Description: "should error if an invalid protocol is provided",
@@ -107,10 +104,7 @@ func TestClient_Create(t *testing.T) {
 				Proto: "udp",
 				Port:  8080,
 			},
-			Err: rest.Error{
-				Code:    "bad data",
-				Message: "the udp protocol is not yet supported",
-			},
+			Err: errors.New("bad data: the udp protocol is not yet supported"),
 		},
 		{
 			Description: "should create the expected HTTP Imposter on success",
@@ -243,10 +237,7 @@ func TestClient_Imposter(t *testing.T) {
 				_, err := mb.Delete(8080, false)
 				expectEqual(t, err, nil)
 			},
-			Err: rest.Error{
-				Code:    "no such resource",
-				Message: "Try POSTing to /imposters first?",
-			},
+			Err: errors.New("no such resource: Try POSTing to /imposters first?"),
 		},
 		{
 			Description: "should return the expected TCP Imposter if it exists on the specified port",

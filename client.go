@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,11 +17,11 @@ import (
 
 // Client represents a native client to the mountebank REST API.
 type Client struct {
-	cli *rest.Client
+	restCli *rest.Client
 }
 
 // NewClient returns a new instance of *Client given its underlying
-// *http.Client cli and base *url.URL to the mountebank API root.
+// *http.Client restCli and base *url.URL to the mountebank API root.
 //
 // If nil, defaults the root *url.URL value to point to http://localhost:2525.
 func NewClient(cli *http.Client, root *url.URL) *Client {
@@ -31,8 +32,28 @@ func NewClient(cli *http.Client, root *url.URL) *Client {
 		}
 	}
 	return &Client{
-		cli: rest.NewClient(cli, root),
+		restCli: rest.NewClient(cli, root),
 	}
+}
+
+// errorDTO represents the structure of an error received from the mountebank API.
+type errorDTO struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// decodeError is a helper method used to decode an errorDTO structure from the
+// given response body, usually when an unexpected response code is returned.
+func (cli *Client) decodeError(body io.ReadCloser) error {
+	var wrap struct {
+		Errors []errorDTO `json:"errors"`
+	}
+	if err := cli.restCli.DecodeResponseBody(body, &wrap); err != nil {
+		return err
+	}
+	// Silently ignore all but the first error value if multiple are returned
+	dto := wrap.Errors[0]
+	return fmt.Errorf("%s: %s", dto.Code, dto.Message)
 }
 
 // Create creates a single new Imposter given its creation details imp.
@@ -48,14 +69,24 @@ func (cli *Client) Create(imp Imposter) (*Imposter, error) {
 		return nil, err
 	}
 
-	req, err := cli.cli.BuildRequest(http.MethodPost, p, bytes.NewReader(b), nil)
+	req, err := cli.restCli.NewRequest(http.MethodPost, p, bytes.NewReader(b), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := cli.cli.ProcessRequest(req, http.StatusCreated, &imp); err != nil {
+	resp, err := cli.restCli.Do(req)
+	if err != nil {
 		return nil, err
 	}
+
+	if resp.StatusCode == http.StatusCreated {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
+	}
+
 	return &imp, nil
 }
 
@@ -72,15 +103,25 @@ func (cli *Client) Imposter(port int, replay bool) (*Imposter, error) {
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.cli.BuildRequest(http.MethodGet, p, nil, vs)
+	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, vs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var imp Imposter
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &imp); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
+
 	return &imp, nil
 }
 
@@ -95,14 +136,23 @@ func (cli *Client) Delete(port int, replay bool) (*Imposter, error) {
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.cli.BuildRequest(http.MethodDelete, p, nil, vs)
+	req, err := cli.restCli.NewRequest(http.MethodDelete, p, nil, vs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var imp Imposter
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &imp); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
 	return &imp, nil
 }
@@ -117,14 +167,23 @@ func (cli *Client) Delete(port int, replay bool) (*Imposter, error) {
 func (cli *Client) DeleteRequests(port int) (*Imposter, error) {
 	p := fmt.Sprintf("/imposters/%d/requests", port)
 
-	req, err := cli.cli.BuildRequest(http.MethodDelete, p, nil, nil)
+	req, err := cli.restCli.NewRequest(http.MethodDelete, p, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var imp Imposter
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &imp); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
 	return &imp, nil
 }
@@ -152,14 +211,23 @@ func (cli *Client) Overwrite(imps []Imposter) ([]Imposter, error) {
 		return nil, err
 	}
 
-	req, err := cli.cli.BuildRequest(http.MethodPut, p, bytes.NewReader(b), nil)
+	req, err := cli.restCli.NewRequest(http.MethodPut, p, bytes.NewReader(b), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var wrap imposterListWrapper
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &wrap); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &wrap); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
 	return wrap.Imposters, nil
 }
@@ -173,14 +241,23 @@ func (cli *Client) Imposters(replay bool) ([]Imposter, error) {
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.cli.BuildRequest(http.MethodGet, p, nil, vs)
+	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, vs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var wrap imposterListWrapper
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &wrap); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &wrap); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
 	return wrap.Imposters, nil
 }
@@ -196,14 +273,23 @@ func (cli *Client) DeleteAll(replay bool) ([]Imposter, error) {
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.cli.BuildRequest(http.MethodDelete, p, nil, vs)
+	req, err := cli.restCli.NewRequest(http.MethodDelete, p, nil, vs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var wrap imposterListWrapper
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &wrap); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &wrap); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
 	return wrap.Imposters, nil
 }
@@ -252,14 +338,23 @@ type Config struct {
 func (cli *Client) Config() (*Config, error) {
 	p := "/config"
 
-	req, err := cli.cli.BuildRequest(http.MethodGet, p, nil, nil)
+	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg := Config{}
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &cfg); err != nil {
+	resp, err := cli.restCli.Do(req)
+	if err != nil {
 		return nil, err
+	}
+
+	var cfg Config
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &cfg); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
 	return &cfg, nil
 }
@@ -291,7 +386,12 @@ func (cli *Client) Logs(start, end int) ([]Log, error) {
 		vs.Add("endIndex", strconv.Itoa(end))
 	}
 
-	req, err := cli.cli.BuildRequest(http.MethodGet, p, nil, vs)
+	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, vs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -299,8 +399,12 @@ func (cli *Client) Logs(start, end int) ([]Log, error) {
 	var wrap struct {
 		Logs []Log `json:"logs"`
 	}
-	if err := cli.cli.ProcessRequest(req, http.StatusOK, &wrap); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &wrap); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
 	}
 	return wrap.Logs, nil
 }
