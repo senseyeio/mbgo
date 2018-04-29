@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/senseyeio/mbgo"
+	"github.com/senseyeio/mbgo/internal/testutil"
 )
 
 func TestImposter_MarshalJSON(t *testing.T) {
@@ -167,16 +168,16 @@ func TestImposter_MarshalJSON(t *testing.T) {
 			t.Parallel()
 
 			ab, err := json.Marshal(c.Imposter)
-			expectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, err, c.Err)
 			eb, err := json.Marshal(c.Expected)
-			expectEqual(t, err, nil)
+			testutil.ExpectEqual(t, err, nil)
 
 			var actual, expected map[string]interface{}
 			// these calls cannot fail
 			_ = json.Unmarshal(ab, &actual)
 			_ = json.Unmarshal(eb, &expected)
 
-			expectEqual(t, actual, expected)
+			testutil.ExpectEqual(t, actual, expected)
 		})
 	}
 }
@@ -347,8 +348,8 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 
 			actual := mbgo.Imposter{}
 			err = json.Unmarshal(b, &actual)
-			expectEqual(t, err, c.Err)
-			expectEqual(t, actual, c.Expected)
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, actual, c.Expected)
 		})
 	}
 }
