@@ -5,7 +5,7 @@ GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]vendor.*')
 default: errcheck fmt lint test vet
 
 errcheck:
-	errcheck -asserts $(GOPACKAGES)
+	errcheck -ignore 'io:Close' -asserts $(GOPACKAGES)
 
 fmt:
 	@for pkg in $(GOPACKAGES); do go fmt -x $$pkg; done
