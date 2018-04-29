@@ -132,12 +132,8 @@ func TestClient_NewRequest(t *testing.T) {
 
 			cli := rest.NewClient(nil, c.Root)
 			req, err := cli.NewRequest(c.Method, c.Path, c.Body, c.Query)
-			if !reflect.DeepEqual(err, c.Err) {
-				t.Errorf("expected %v to equal %v\n", err, c.Err)
-			}
-			if !reflect.DeepEqual(req, c.Request) {
-				t.Errorf("expected\n%v\nto equal\n%v\n", req, c.Request)
-			}
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, req, c.Request)
 		})
 	}
 }

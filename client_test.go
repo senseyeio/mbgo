@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/senseyeio/mbgo"
+	"github.com/senseyeio/mbgo/internal/testutil"
 
 	// Docker client dependencies must be vendored in order for
 	// their internal package imports to resolve properly.
@@ -148,12 +148,12 @@ func TestClient_Create(t *testing.T) {
 			},
 			Before: func(mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				expectEqual(t, err, nil)
+				testutil.ExpectEqual(t, err, nil)
 			},
 			After: func(mb *mbgo.Client) {
 				imp, err := mb.Delete(8080, false)
-				expectEqual(t, err, nil)
-				expectEqual(t, imp.Name, "create_test")
+				testutil.ExpectEqual(t, err, nil)
+				testutil.ExpectEqual(t, imp.Name, "create_test")
 			},
 			Expected: &mbgo.Imposter{
 				Proto:          "http",
@@ -204,8 +204,8 @@ func TestClient_Create(t *testing.T) {
 			}
 
 			actual, err := mb.Create(c.Input)
-			expectEqual(t, err, c.Err)
-			expectEqual(t, actual, c.Expected)
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, actual, c.Expected)
 
 			if c.After != nil {
 				c.After(mb)
@@ -235,7 +235,7 @@ func TestClient_Imposter(t *testing.T) {
 			Port:        8080,
 			Before: func(mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				expectEqual(t, err, nil)
+				testutil.ExpectEqual(t, err, nil)
 			},
 			Err: errors.New("no such resource: Try POSTing to /imposters first?"),
 		},
@@ -243,7 +243,7 @@ func TestClient_Imposter(t *testing.T) {
 			Description: "should return the expected TCP Imposter if it exists on the specified port",
 			Before: func(mb *mbgo.Client) {
 				_, err := mb.Delete(8081, false)
-				expectEqual(t, err, nil)
+				testutil.ExpectEqual(t, err, nil)
 
 				imp, err := mb.Create(mbgo.Imposter{
 					Port:           8081,
@@ -271,13 +271,13 @@ func TestClient_Imposter(t *testing.T) {
 						},
 					},
 				})
-				expectEqual(t, err, nil)
-				expectEqual(t, imp.Name, "imposter_test")
+				testutil.ExpectEqual(t, err, nil)
+				testutil.ExpectEqual(t, imp.Name, "imposter_test")
 			},
 			After: func(mb *mbgo.Client) {
 				imp, err := mb.Delete(8081, false)
-				expectEqual(t, err, nil)
-				expectEqual(t, imp.Name, "imposter_test")
+				testutil.ExpectEqual(t, err, nil)
+				testutil.ExpectEqual(t, imp.Name, "imposter_test")
 			},
 			Port:   8081,
 			Replay: false,
@@ -318,8 +318,8 @@ func TestClient_Imposter(t *testing.T) {
 			}
 
 			actual, err := mb.Imposter(c.Port, c.Replay)
-			expectEqual(t, err, c.Err)
-			expectEqual(t, actual, c.Expected)
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, actual, c.Expected)
 
 			if c.After != nil {
 				c.After(mb)
@@ -349,7 +349,7 @@ func TestClient_Delete(t *testing.T) {
 			Port:        8080,
 			Before: func(mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				expectEqual(t, err, nil)
+				testutil.ExpectEqual(t, err, nil)
 			},
 			Expected: &mbgo.Imposter{},
 		},
@@ -362,21 +362,13 @@ func TestClient_Delete(t *testing.T) {
 			}
 
 			actual, err := mb.Delete(c.Port, c.Replay)
-			expectEqual(t, err, c.Err)
-			expectEqual(t, actual, c.Expected)
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, actual, c.Expected)
 
 			if c.After != nil {
 				c.After(mb)
 			}
 		})
-	}
-}
-
-// expectEqual is a helper function used throughout the unit and integration
-// tests to assert deep quality between an actual and expected value.
-func expectEqual(t *testing.T, actual, expected interface{}) {
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("\nexpected:\n\t%+v\nto equal:\n\t%+v\n", actual, expected)
 	}
 }
 
