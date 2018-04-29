@@ -47,24 +47,14 @@ func (cli *Client) NewRequest(method, path string, body io.Reader, q url.Values)
 
 // Do sends an HTTP request and returns an HTTP response.
 func (cli *Client) Do(req *http.Request) (*http.Response, error) {
-	resp, err := cli.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	return resp, err
+	return cli.httpClient.Do(req)
 }
 
 // DecodeResponseBody reads a JSON-encoded value from the provided
 // HTTP response body and stores it into the value pointed to by v
 // and closes the body after reading.
 func (cli *Client) DecodeResponseBody(body io.ReadCloser, v interface{}) error {
-	var closeErr error
-	defer func() {
-		closeErr = body.Close()
-	}()
+	defer body.Close()
 
-	if err := json.NewDecoder(body).Decode(v); err != nil {
-		return err
-	}
-	return closeErr
+	return json.NewDecoder(body).Decode(v)
 }

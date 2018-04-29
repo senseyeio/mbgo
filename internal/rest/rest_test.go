@@ -1,15 +1,19 @@
 package rest_test
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/senseyeio/mbgo/internal/rest"
+	"github.com/senseyeio/mbgo/internal/testutil"
 )
 
 func TestClient_NewRequest(t *testing.T) {
@@ -134,6 +138,60 @@ func TestClient_NewRequest(t *testing.T) {
 			if !reflect.DeepEqual(req, c.Request) {
 				t.Errorf("expected\n%v\nto equal\n%v\n", req, c.Request)
 			}
+		})
+	}
+}
+
+type testDTO struct {
+	Test bool   `json:"test"`
+	Foo  string `json:"foo"`
+}
+
+func TestClient_DecodeResponseBody(t *testing.T) {
+	cases := []struct {
+		// general
+		Description string
+
+		// inputs
+		Body  io.ReadCloser
+		Value interface{}
+
+		// output expectations
+		Expected interface{}
+		Err      error
+	}{
+		{
+			Description: "should return an error if the JSON cannot be decoded into the value pointer",
+			Body:        ioutil.NopCloser(strings.NewReader(`"foo"`)),
+			Value:       &testDTO{},
+			Expected:    &testDTO{},
+			Err: &json.UnmarshalTypeError{
+				Offset: 5, // 5 bytes read before first full JSON value
+				Value:  "string",
+				Type:   reflect.TypeOf(testDTO{}),
+			},
+		},
+		{
+			Description: "should unmarshal the expected JSON into value pointer when valid",
+			Body:        ioutil.NopCloser(strings.NewReader(`{"test":true,"foo":"bar"}`)),
+			Value:       &testDTO{},
+			Expected: &testDTO{
+				Test: true,
+				Foo:  "bar",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+
+		t.Run(c.Description, func(t *testing.T) {
+			t.Parallel()
+
+			cli := rest.NewClient(nil, nil)
+			err := cli.DecodeResponseBody(c.Body, c.Value)
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, c.Value, c.Expected)
 		})
 	}
 }
