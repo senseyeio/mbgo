@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,12 +84,17 @@ func TestClient_Create(t *testing.T) {
 	mb := newMountebankClient(nil)
 
 	cases := []struct {
+		// general
 		Description string
 		Before      func(*mbgo.Client)
 		After       func(*mbgo.Client)
-		Input       mbgo.Imposter
-		Expected    *mbgo.Imposter
-		Err         error
+
+		// input
+		Input mbgo.Imposter
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
 	}{
 		{
 			Description: "should error if an invalid port is provided",
@@ -222,13 +228,18 @@ func TestClient_Imposter(t *testing.T) {
 	mb := newMountebankClient(nil)
 
 	cases := []struct {
+		// general
 		Description string
 		Before      func(*mbgo.Client)
 		After       func(*mbgo.Client)
-		Port        int
-		Replay      bool
-		Expected    *mbgo.Imposter
-		Err         error
+
+		// input
+		Port   int
+		Replay bool
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
 	}{
 		{
 			Description: "should error if an Imposter does not exist on the specified port",
@@ -336,13 +347,18 @@ func TestClient_Delete(t *testing.T) {
 	mb := newMountebankClient(nil)
 
 	cases := []struct {
+		// general
 		Description string
 		Before      func(*mbgo.Client)
 		After       func(*mbgo.Client)
-		Port        int
-		Replay      bool
-		Expected    *mbgo.Imposter
-		Err         error
+
+		// input
+		Port   int
+		Replay bool
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
 	}{
 		{
 			Description: "should return an empty Imposter struct if one is not configured on the specified port",
@@ -362,6 +378,103 @@ func TestClient_Delete(t *testing.T) {
 			}
 
 			actual, err := mb.Delete(c.Port, c.Replay)
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(mb)
+			}
+		})
+	}
+}
+
+func TestClient_DeleteRequests(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	mb := newMountebankClient(nil)
+
+	cases := []struct {
+		// general
+		Description string
+		Before      func(*mbgo.Client)
+		After       func(*mbgo.Client)
+
+		// input
+		Port int
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
+	}{
+		{
+			Description: "should return an empty Imposter struct if one is not configured on the specified port",
+			Before: func(mb *mbgo.Client) {
+				_, err := mb.Delete(8080, false)
+				testutil.ExpectEqual(t, err, nil)
+			},
+			Port:     8080,
+			Expected: &mbgo.Imposter{},
+		},
+		{
+			Description: "should return the expected Imposter if it exists on successful deletion",
+			Before: func(mb *mbgo.Client) {
+				_, err := mb.Delete(8080, false)
+				testutil.ExpectEqual(t, err, nil)
+
+				_, err = mb.Create(mbgo.Imposter{
+					Port:           8080,
+					Proto:          "http",
+					Name:           "delete_requests_test",
+					RecordRequests: true,
+				})
+				testutil.ExpectEqual(t, err, nil)
+
+				// make some HTTP requests to the new Imposter
+				for i := 0; i < 1; i++ {
+					resp, err := http.Get("http://localhost:8080/foo?bar=true")
+					testutil.ExpectEqual(t, err, nil)
+					testutil.ExpectEqual(t, resp.StatusCode, http.StatusOK)
+				}
+			},
+			After: func(mb *mbgo.Client) {
+				imp, err := mb.Delete(8080, false)
+				testutil.ExpectEqual(t, err, nil)
+				testutil.ExpectEqual(t, imp.Name, "delete_requests_test")
+			},
+			Port: 8080,
+			Expected: &mbgo.Imposter{
+				Port:         8080,
+				Proto:        "http",
+				Name:         "delete_requests_test",
+				RequestCount: 0,
+				Requests: []interface{}{
+					mbgo.HTTPRequest{
+						RequestFrom: net.IPv4(172, 17, 0, 1),
+						Method:      http.MethodGet,
+						Path:        "/foo",
+						Headers: map[string]string{
+							"Host":            "localhost:8080",
+							"User-Agent":      "Go-http-client/1.1",
+							"Accept-Encoding": "gzip",
+						},
+						Query: map[string]string{
+							"bar": "true",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(mb)
+			}
+
+			actual, err := mb.DeleteRequests(c.Port)
 			testutil.ExpectEqual(t, err, c.Err)
 			testutil.ExpectEqual(t, actual, c.Expected)
 
@@ -404,11 +517,7 @@ func createDockerContainer(ctx context.Context, cli *client.Client, image string
 		Cmd:   []string{"mb", "--mock", "--debug"},
 		ExposedPorts: nat.PortSet{
 			"2525/tcp": struct{}{},
-			// ports used by imposter fixtures
-			"8080/tcp": struct{}{}, // http
-			"8081/tcp": struct{}{}, // https
-			"8082/tcp": struct{}{}, // tcp
-			"8083/tcp": struct{}{}, // smtp
+			"8080/tcp": struct{}{},
 		},
 		Healthcheck: &container.HealthConfig{
 			Test:     []string{"CMD", "nc", "-z", "localhost", "2525"},
@@ -422,15 +531,6 @@ func createDockerContainer(ctx context.Context, cli *client.Client, image string
 			},
 			"8080/tcp": []nat.PortBinding{
 				{HostIP: "0.0.0.0", HostPort: "8080"},
-			},
-			"8081/tcp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: "8081"},
-			},
-			"8082/tcp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: "8082"},
-			},
-			"8083/tcp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: "8083"},
 			},
 		},
 	}, nil, "mbgo_integration_test")

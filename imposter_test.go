@@ -31,11 +31,8 @@ func TestImposter_MarshalJSON(t *testing.T) {
 							{
 								Operator: "equals",
 								Request: &mbgo.TCPRequest{
-									RequestFrom: &net.TCPAddr{
-										IP:   net.IPv4(172, 17, 0, 1),
-										Port: 58112,
-									},
-									Data: "SGVsbG8sIHdvcmxkIQ==",
+									RequestFrom: net.IPv4(172, 17, 0, 1),
+									Data:        "SGVsbG8sIHdvcmxkIQ==",
 								},
 							},
 						},
@@ -62,7 +59,7 @@ func TestImposter_MarshalJSON(t *testing.T) {
 							map[string]interface{}{
 								"equals": map[string]interface{}{
 									"data":        "SGVsbG8sIHdvcmxkIQ==",
-									"requestFrom": "172.17.0.1:58112",
+									"requestFrom": "172.17.0.1",
 								},
 							},
 						},
@@ -91,12 +88,9 @@ func TestImposter_MarshalJSON(t *testing.T) {
 							{
 								Operator: "equals",
 								Request: mbgo.HTTPRequest{
-									RequestFrom: &net.TCPAddr{
-										IP:   net.IPv4(172, 17, 0, 1),
-										Port: 58112,
-									},
-									Method: http.MethodGet,
-									Path:   "/foo",
+									RequestFrom: net.IPv4(172, 17, 0, 1),
+									Method:      http.MethodGet,
+									Path:        "/foo",
 									Query: map[string]string{
 										"page": "3",
 									},
@@ -132,7 +126,7 @@ func TestImposter_MarshalJSON(t *testing.T) {
 						"predicates": []interface{}{
 							map[string]interface{}{
 								"equals": map[string]interface{}{
-									"requestFrom": "172.17.0.1:58112",
+									"requestFrom": "172.17.0.1",
 									"method":      http.MethodGet,
 									"path":        "/foo",
 									"query": map[string]string{
@@ -241,12 +235,9 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 							{
 								Operator: "equals",
 								Request: mbgo.HTTPRequest{
-									RequestFrom: &net.TCPAddr{
-										IP:   net.IPv4(172, 17, 0, 1),
-										Port: 58112,
-									},
-									Method: "POST",
-									Path:   "/foo",
+									RequestFrom: net.IPv4(172, 17, 0, 1),
+									Method:      "POST",
+									Path:        "/foo",
 									Query: map[string]string{
 										"bar": "baz",
 									},
@@ -313,11 +304,8 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 							{
 								Operator: "equals",
 								Request: mbgo.TCPRequest{
-									RequestFrom: &net.TCPAddr{
-										IP:   net.IPv4(172, 17, 0, 1),
-										Port: 58112,
-									},
-									Data: "SGVsbG8sIHdvcmxkIQ==",
+									RequestFrom: net.IPv4(172, 17, 0, 1),
+									Data:        "SGVsbG8sIHdvcmxkIQ==",
 								},
 							},
 						},

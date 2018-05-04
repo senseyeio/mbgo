@@ -3,8 +3,21 @@ package mbgo
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
+	"strings"
 )
+
+func parseHybridAddress(s string) (ip net.IP, err error) {
+	parts := strings.Split(s, ":")
+	ipStr := strings.Join(parts[0:len(parts)-1], ":")
+
+	ip = net.ParseIP(ipStr)
+	if ip == nil {
+		err = fmt.Errorf("invalid IP address: %s", ipStr)
+	}
+	return
+}
 
 // HTTPRequest describes an incoming HTTP request received by an
 // Imposter of the "http" protocol.
@@ -13,7 +26,7 @@ import (
 // http://www.mbtest.org/docs/protocols/http.
 type HTTPRequest struct {
 	// RequestFrom is the originating address of the incoming request.
-	RequestFrom net.Addr
+	RequestFrom net.IP
 	// Method is the HTTP request method.
 	Method string
 	// Path is the path of the request, without the query parameters.
@@ -53,41 +66,6 @@ func (r HTTPRequest) toDTO() httpRequestDTO {
 	return dto
 }
 
-// HTTPResponse is a Response.Value used to respond to a matched HTTPRequest.
-//
-// See more information about HTTP responses in mountebank at:
-// http://www.mbtest.org/docs/protocols/http.
-type HTTPResponse struct {
-	// StatusCode is the HTTP status code of the response.
-	StatusCode int
-	// Headers are the HTTP headers in the response.
-	Headers map[string]string
-	// Body is the body of the response.
-	Body string
-	// Mode is the mode of the response; either "text" or "binary".
-	// Defaults to "text" if excluded.
-	Mode string
-}
-
-// httpResponseDTO is the data-transfer object used to describe the
-// JSON structure of an HTTPResponse value.
-type httpResponseDTO struct {
-	StatusCode int               `json:"statusCode,omitempty"`
-	Headers    map[string]string `json:"headers,omitempty"`
-	Body       string            `json:"body,omitempty"`
-	Mode       string            `json:"_mode,omitempty"`
-}
-
-// toDTO maps a HTTPResponse value to an httpResponseDTO value.
-func (r HTTPResponse) toDTO() httpResponseDTO {
-	return httpResponseDTO{
-		StatusCode: r.StatusCode,
-		Headers:    r.Headers,
-		Body:       r.Body,
-		Mode:       r.Mode,
-	}
-}
-
 // TCPRequest describes incoming TCP data received by an Imposter of
 // the "tcp" protocol.
 //
@@ -95,7 +73,7 @@ func (r HTTPResponse) toDTO() httpResponseDTO {
 // http://www.mbtest.org/docs/protocols/tcp.
 type TCPRequest struct {
 	// RequestFrom is the originating address of the incoming request.
-	RequestFrom net.Addr
+	RequestFrom net.IP
 	// Data is the data in the request as plaintext.
 	Data string
 }
@@ -117,27 +95,51 @@ func (r TCPRequest) toDTO() tcpRequestDTO {
 	return dto
 }
 
-// TCPResponse is a Response.Value to a matched incoming TCPRequest.
-//
-// See more information about TCP responses in mountebank at:
-// http://www.mbtest.org/docs/protocols/tcp.
-type TCPResponse struct {
-	// Data is the data in the data contained in the response.
-	// An empty string does not respond with data, but does send
-	// the FIN bit.
-	Data string
-}
+// unmarshalRequest unmarshals a network request given its protocol proto and the JSON data b.
+func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error) {
+	switch proto {
+	case "http":
+		var dto httpRequestDTO
+		if err = json.Unmarshal(b, &dto); err != nil {
+			return
+		}
+		var ip net.IP
+		if dto.RequestFrom != "" {
+			ip, err = parseHybridAddress(dto.RequestFrom)
+			if err != nil {
+				return
+			}
+		}
+		v = HTTPRequest{
+			RequestFrom: ip,
+			Method:      dto.Method,
+			Path:        dto.Path,
+			Query:       dto.Query,
+			Headers:     dto.Headers,
+			Body:        dto.Body,
+		}
+		return
 
-// tcpResponseDTO is the data-transfer object used to describe the
-// JSON structure of an TCPResponse value.
-type tcpResponseDTO struct {
-	Data string `json:"data"`
-}
+	case "tcp":
+		var dto tcpRequestDTO
+		if err = json.Unmarshal(b, &dto); err != nil {
+			return
+		}
+		var ip net.IP
+		if dto.RequestFrom != "" {
+			ip, err = parseHybridAddress(dto.RequestFrom)
+			if err != nil {
+				return
+			}
+		}
+		v = TCPRequest{
+			RequestFrom: ip,
+			Data:        dto.Data,
+		}
+		return
 
-// toDTO maps a TCPResponse value to a tcpResponseDTO value.
-func (r TCPResponse) toDTO() tcpResponseDTO {
-	return tcpResponseDTO{
-		Data: r.Data,
+	default:
+		return nil, fmt.Errorf("unsupported protocol: %s", proto)
 	}
 }
 
@@ -195,48 +197,68 @@ func (dto predicateDTO) unmarshalProto(proto string) (p Predicate, err error) {
 
 	for key, b := range dto {
 		p.Operator = key
-
-		switch proto {
-		case "http":
-			r := httpRequestDTO{}
-			if err = json.Unmarshal(b, &r); err != nil {
-				return
-			}
-			var addr net.Addr
-			if r.RequestFrom != "" {
-				addr, err = net.ResolveTCPAddr("tcp", r.RequestFrom)
-				if err != nil {
-					return
-				}
-			}
-			p.Request = HTTPRequest{
-				RequestFrom: addr,
-				Method:      r.Method,
-				Path:        r.Path,
-				Query:       r.Query,
-				Headers:     r.Headers,
-				Body:        r.Body,
-			}
-
-		case "tcp":
-			r := tcpRequestDTO{}
-			if err = json.Unmarshal(b, &r); err != nil {
-				return
-			}
-			var addr net.Addr
-			if r.RequestFrom != "" {
-				addr, err = net.ResolveTCPAddr("tcp", r.RequestFrom)
-				if err != nil {
-					return
-				}
-			}
-			p.Request = TCPRequest{
-				RequestFrom: addr,
-				Data:        r.Data,
-			}
-		}
+		p.Request, err = unmarshalRequest(proto, b)
 	}
 	return
+}
+
+// HTTPResponse is a Response.Value used to respond to a matched HTTPRequest.
+//
+// See more information about HTTP responses in mountebank at:
+// http://www.mbtest.org/docs/protocols/http.
+type HTTPResponse struct {
+	// StatusCode is the HTTP status code of the response.
+	StatusCode int
+	// Headers are the HTTP headers in the response.
+	Headers map[string]string
+	// Body is the body of the response.
+	Body string
+	// Mode is the mode of the response; either "text" or "binary".
+	// Defaults to "text" if excluded.
+	Mode string
+}
+
+// httpResponseDTO is the data-transfer object used to describe the
+// JSON structure of an HTTPResponse value.
+type httpResponseDTO struct {
+	StatusCode int               `json:"statusCode,omitempty"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	Body       string            `json:"body,omitempty"`
+	Mode       string            `json:"_mode,omitempty"`
+}
+
+// toDTO maps a HTTPResponse value to an httpResponseDTO value.
+func (r HTTPResponse) toDTO() httpResponseDTO {
+	return httpResponseDTO{
+		StatusCode: r.StatusCode,
+		Headers:    r.Headers,
+		Body:       r.Body,
+		Mode:       r.Mode,
+	}
+}
+
+// TCPResponse is a Response.Value to a matched incoming TCPRequest.
+//
+// See more information about TCP responses in mountebank at:
+// http://www.mbtest.org/docs/protocols/tcp.
+type TCPResponse struct {
+	// Data is the data in the data contained in the response.
+	// An empty string does not respond with data, but does send
+	// the FIN bit.
+	Data string
+}
+
+// tcpResponseDTO is the data-transfer object used to describe the
+// JSON structure of an TCPResponse value.
+type tcpResponseDTO struct {
+	Data string `json:"data"`
+}
+
+// toDTO maps a TCPResponse value to a tcpResponseDTO value.
+func (r TCPResponse) toDTO() tcpResponseDTO {
+	return tcpResponseDTO{
+		Data: r.Data,
+	}
 }
 
 // Response defines a networked response sent by a Stub whenever an
@@ -424,6 +446,10 @@ type Imposter struct {
 	// by having it remember any requests made to it, which can later
 	// be retrieved and examined by the testing environment.
 	RecordRequests bool
+	// Requests are the list of recorded requests, or nil if RecordRequests == false.
+	// Note that the underlying type will be HTTPRequest or TCPRequest depending on
+	// the protocol of the Imposter.
+	Requests []interface{}
 	// RequestCount is the number of matched requests received by the Imposter.
 	// Note that this value is only used/set when receiving Imposter data
 	// from the mountebank server.
@@ -477,11 +503,12 @@ func (imp Imposter) MarshalJSON() ([]byte, error) {
 // See details about the full response structure of an Imposter at:
 // http://www.mbtest.org/docs/api/contracts?type=imposter
 type imposterResponseDTO struct {
-	Port         int       `json:"port"`
-	Proto        string    `json:"protocol"`
-	Name         string    `json:"name,omitempty"`
-	RequestCount int       `json:"numberOfRequests"`
-	Stubs        []stubDTO `json:"stubs,omitempty"`
+	Port         int               `json:"port"`
+	Proto        string            `json:"protocol"`
+	Name         string            `json:"name,omitempty"`
+	RequestCount int               `json:"numberOfRequests"`
+	Stubs        []stubDTO         `json:"stubs,omitempty"`
+	Requests     []json.RawMessage `json:"requests,omitempty"`
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface for Imposter.
@@ -503,7 +530,7 @@ func (imp *Imposter) UnmarshalJSON(b []byte) error {
 	imp.Proto = dto.Proto
 	imp.Name = dto.Name
 	imp.RequestCount = dto.RequestCount
-	if dto.Stubs != nil {
+	if len(dto.Stubs) > 0 {
 		imp.Stubs = make([]Stub, 0, len(dto.Stubs))
 		for _, v := range dto.Stubs {
 			stub, err := v.unmarshalProto(imp.Proto)
@@ -511,6 +538,17 @@ func (imp *Imposter) UnmarshalJSON(b []byte) error {
 				return err
 			}
 			imp.Stubs = append(imp.Stubs, stub)
+		}
+	}
+	if len(dto.Requests) > 0 {
+		imp.Requests = make([]interface{}, 0, len(dto.Requests))
+
+		for _, b := range dto.Requests {
+			req, err := unmarshalRequest(imp.Proto, b)
+			if err != nil {
+				return err
+			}
+			imp.Requests = append(imp.Requests, req)
 		}
 	}
 	return nil
