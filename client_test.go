@@ -76,6 +76,20 @@ func TestMain(m *testing.M) {
 	code = m.Run()
 }
 
+func TestClient_Logs(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	mb := newMountebankClient(nil)
+
+	vs, err := mb.Logs(-1, -1)
+	testutil.ExpectEqual(t, err, nil)
+	testutil.ExpectEqual(t, len(vs), 2)
+	testutil.ExpectEqual(t, vs[0].Message, "[mb:2525] mountebank v1.14.0 now taking orders - point your browser to http://localhost:2525 for help")
+	testutil.ExpectEqual(t, vs[1].Message, "[mb:2525] GET /logs")
+}
+
 func TestClient_Create(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
@@ -253,7 +267,7 @@ func TestClient_Imposter(t *testing.T) {
 		{
 			Description: "should return the expected TCP Imposter if it exists on the specified port",
 			Before: func(mb *mbgo.Client) {
-				_, err := mb.Delete(8081, false)
+				_, err := mb.Delete(8080, false)
 				testutil.ExpectEqual(t, err, nil)
 
 				imp, err := mb.Create(mbgo.Imposter{
@@ -475,6 +489,148 @@ func TestClient_DeleteRequests(t *testing.T) {
 			}
 
 			actual, err := mb.DeleteRequests(c.Port)
+			testutil.ExpectEqual(t, err, c.Err)
+			testutil.ExpectEqual(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(mb)
+			}
+		})
+	}
+}
+
+func TestClient_Config(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	mb := newMountebankClient(nil)
+
+	cfg, err := mb.Config()
+	testutil.ExpectEqual(t, err, nil)
+	testutil.ExpectEqual(t, cfg.Version, "1.14.0")
+}
+
+func TestClient_Imposters(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	cases := []struct {
+		// general
+		Description string
+		Before      func(*mbgo.Client)
+		After       func(*mbgo.Client)
+
+		// input
+		Replay bool
+
+		// output expectations
+		Expected []mbgo.Imposter
+		Err      error
+	}{
+		{
+			Description: "should return a minimal representation of all registered Imposters",
+			Before: func(mb *mbgo.Client) {
+				_, err := mb.DeleteAll(false)
+				testutil.ExpectEqual(t, err, nil)
+
+				// create a tcp imposter
+				imp, err := mb.Create(mbgo.Imposter{
+					Port:           8080,
+					Proto:          "tcp",
+					Name:           "imposters_tcp_test",
+					RecordRequests: true,
+					Stubs: []mbgo.Stub{
+						{
+							Predicates: []mbgo.Predicate{
+								{
+									Operator: "endsWith",
+									Request: mbgo.TCPRequest{
+										Data: "SGVsbG8sIHdvcmxkIQ==",
+									},
+								},
+							},
+							Responses: []mbgo.Response{
+								{
+									Type: "is",
+									Value: mbgo.TCPResponse{
+										Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+									},
+								},
+							},
+						},
+					},
+				})
+				testutil.ExpectEqual(t, err, nil)
+				testutil.ExpectEqual(t, imp.Name, "imposters_tcp_test")
+
+				// and an http imposter
+				imp, err = mb.Create(mbgo.Imposter{
+					Proto:          "http",
+					Port:           8081,
+					Name:           "imposters_http_test",
+					RecordRequests: true,
+					AllowCORS:      true,
+					Stubs: []mbgo.Stub{
+						{
+							Predicates: []mbgo.Predicate{
+								{
+									Operator: "equals",
+									Request: mbgo.HTTPRequest{
+										Method: http.MethodGet,
+										Path:   "/foo",
+										Query: map[string]string{
+											"page": "3",
+										},
+										Headers: map[string]string{
+											"Accept": "application/json",
+										},
+									},
+								},
+							},
+							Responses: []mbgo.Response{
+								{
+									Type: "is",
+									Value: mbgo.HTTPResponse{
+										StatusCode: http.StatusOK,
+										Headers: map[string]string{
+											"Content-Type": "application/json",
+										},
+										Body: `{"test":true}`,
+									},
+								},
+							},
+						},
+					},
+				})
+				testutil.ExpectEqual(t, err, nil)
+				testutil.ExpectEqual(t, imp.Name, "imposters_http_test")
+			},
+			Expected: []mbgo.Imposter{
+				{
+					Port:         8080,
+					Proto:        "tcp",
+					RequestCount: 0,
+				},
+				{
+					Port:         8081,
+					Proto:        "http",
+					RequestCount: 0,
+				},
+			},
+		},
+	}
+
+	mb := newMountebankClient(nil)
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(mb)
+			}
+
+			actual, err := mb.Imposters(c.Replay)
 			testutil.ExpectEqual(t, err, c.Err)
 			testutil.ExpectEqual(t, actual, c.Expected)
 
