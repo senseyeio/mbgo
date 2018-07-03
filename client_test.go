@@ -1,3 +1,5 @@
+// +build integration
+
 package mbgo_test
 
 import (
@@ -15,8 +17,6 @@ import (
 	"github.com/senseyeio/mbgo"
 	"github.com/senseyeio/mbgo/internal/testutil"
 
-	// Docker client dependencies must be vendored in order for
-	// their internal package imports to resolve properly.
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -36,65 +36,55 @@ func TestMain(m *testing.M) {
 		os.Exit(code)
 	}()
 
-	if !testing.Short() {
-		ctx := context.Background()
-		cli := mustNewDockerClient()
-		image := "andyrbell/mountebank:1.14.0"
+	ctx := context.Background()
+	cli := mustNewDockerClient()
+	image := "andyrbell/mountebank:1.14.1"
 
-		var (
-			id  string
-			err error
-		)
+	var (
+		id  string
+		err error
+	)
 
-		// setup a mountebank Docker container for integration tests
-		if err = pullDockerImage(ctx, cli, image, time.Second*45); err != nil {
-			panic(err)
-		}
-		id, err = createDockerContainer(ctx, cli, image, time.Second*5)
-		if err != nil {
-			panic(err)
-		}
-		if err = startDockerContainer(ctx, cli, id, time.Second*3); err != nil {
-			panic(err)
-		}
-		if err = waitHealthyDockerContainer(ctx, cli, id, time.Second*10); err != nil {
-			panic(err)
-		}
-
-		// Always stop/remove the test container, even on test failure or panic.
-		defer func() {
-			if err = stopDockerContainer(ctx, cli, id, time.Second*3); err != nil {
-				panic(err)
-			}
-			if err = removeDockerContainer(ctx, cli, id, time.Second*3); err != nil {
-				panic(err)
-			}
-		}()
+	// setup a mountebank Docker container for integration tests
+	if err = pullDockerImage(ctx, cli, image, time.Second*45); err != nil {
+		panic(err)
 	}
+	id, err = createDockerContainer(ctx, cli, image, time.Second*5)
+	if err != nil {
+		panic(err)
+	}
+	if err = startDockerContainer(ctx, cli, id, time.Second*3); err != nil {
+		panic(err)
+	}
+	if err = waitHealthyDockerContainer(ctx, cli, id, time.Second*10); err != nil {
+		panic(err)
+	}
+
+	// Always stop/remove the test container, even on test failure or panic.
+	defer func() {
+		if err = stopDockerContainer(ctx, cli, id, time.Second*3); err != nil {
+			panic(err)
+		}
+		if err = removeDockerContainer(ctx, cli, id, time.Second*3); err != nil {
+			panic(err)
+		}
+	}()
 
 	// run the main test cases
 	code = m.Run()
 }
 
 func TestClient_Logs(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
 	mb := newMountebankClient(nil)
 
 	vs, err := mb.Logs(-1, -1)
 	testutil.ExpectEqual(t, err, nil)
-	testutil.ExpectEqual(t, len(vs), 2)
-	testutil.ExpectEqual(t, vs[0].Message, "[mb:2525] mountebank v1.14.0 now taking orders - point your browser to http://localhost:2525 for help")
+	testutil.ExpectEqual(t, len(vs) >= 2, true)
+	testutil.ExpectEqual(t, vs[0].Message, "[mb:2525] mountebank v1.14.1 now taking orders - point your browser to http://localhost:2525 for help")
 	testutil.ExpectEqual(t, vs[1].Message, "[mb:2525] GET /logs")
 }
 
 func TestClient_Create(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
 	mb := newMountebankClient(nil)
 
 	cases := []struct {
@@ -235,10 +225,6 @@ func TestClient_Create(t *testing.T) {
 }
 
 func TestClient_Imposter(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
 	mb := newMountebankClient(nil)
 
 	cases := []struct {
@@ -271,7 +257,7 @@ func TestClient_Imposter(t *testing.T) {
 				testutil.ExpectEqual(t, err, nil)
 
 				imp, err := mb.Create(mbgo.Imposter{
-					Port:           8081,
+					Port:           8080,
 					Proto:          "tcp",
 					Name:           "imposter_test",
 					RecordRequests: true,
@@ -300,14 +286,14 @@ func TestClient_Imposter(t *testing.T) {
 				testutil.ExpectEqual(t, imp.Name, "imposter_test")
 			},
 			After: func(mb *mbgo.Client) {
-				imp, err := mb.Delete(8081, false)
+				imp, err := mb.Delete(8080, false)
 				testutil.ExpectEqual(t, err, nil)
 				testutil.ExpectEqual(t, imp.Name, "imposter_test")
 			},
-			Port:   8081,
+			Port:   8080,
 			Replay: false,
 			Expected: &mbgo.Imposter{
-				Port:           8081,
+				Port:           8080,
 				Proto:          "tcp",
 				Name:           "imposter_test",
 				RecordRequests: false, // this field is only used for creation
@@ -354,10 +340,6 @@ func TestClient_Imposter(t *testing.T) {
 }
 
 func TestClient_Delete(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
 	mb := newMountebankClient(nil)
 
 	cases := []struct {
@@ -403,10 +385,6 @@ func TestClient_Delete(t *testing.T) {
 }
 
 func TestClient_DeleteRequests(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
 	mb := newMountebankClient(nil)
 
 	cases := []struct {
@@ -500,22 +478,14 @@ func TestClient_DeleteRequests(t *testing.T) {
 }
 
 func TestClient_Config(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
 	mb := newMountebankClient(nil)
 
 	cfg, err := mb.Config()
 	testutil.ExpectEqual(t, err, nil)
-	testutil.ExpectEqual(t, cfg.Version, "1.14.0")
+	testutil.ExpectEqual(t, cfg.Version, "1.14.1")
 }
 
 func TestClient_Imposters(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
 	cases := []struct {
 		// general
 		Description string
@@ -641,19 +611,18 @@ func TestClient_Imposters(t *testing.T) {
 	}
 }
 
-// mustNewDockerClient creates a new Docker client instance from
-// the the system's environment variables.
-//
-// Use DOCKER_HOST to set the url to the docker server.
-// Use DOCKER_API_VERSION to set the version of the API to reach, leave empty for latest.
-// Use DOCKER_CERT_PATH to load the tls certificates from.
-// Use DOCKER_TLS_VERIFY to enable or disable TLS verification, off by default.
 func mustNewDockerClient() *client.Client {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
 	}
 	return cli
+}
+
+func newMountebankClient(u *url.URL) *mbgo.Client {
+	return mbgo.NewClient(&http.Client{
+		Timeout: time.Second,
+	}, u)
 }
 
 func pullDockerImage(ctx context.Context, cli *client.Client, name string, timeout time.Duration) error {
@@ -735,12 +704,4 @@ func removeDockerContainer(ctx context.Context, cli *client.Client, id string, t
 	defer cancel()
 
 	return cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{})
-}
-
-// newMountebankClient creates a new *mbgo.Client instance given its
-// API base URL u; localhost:2525 used in integration tests.
-func newMountebankClient(u *url.URL) *mbgo.Client {
-	return mbgo.NewClient(&http.Client{
-		Timeout: time.Second,
-	}, u)
 }

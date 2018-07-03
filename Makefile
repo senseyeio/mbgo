@@ -1,27 +1,25 @@
-GOPACKAGES = $(shell go list ./... | grep -v -e '.*[/-]vendor.*')
+GOPACKAGES := $(shell go list github.com/senseyeio/mbgo/...)
 
-.PHONY: default errcheck fmt lint test testshort tools vet
-
-default: errcheck fmt lint test vet
-
-errcheck:
-	errcheck -ignore 'io:Close' -asserts $(GOPACKAGES)
-
+.PHONY: fmt
 fmt:
-	@for pkg in $(GOPACKAGES); do go fmt -x $$pkg; done
+	@for pkg in $(GOPACKAGES); do go fmt $$pkg; done
 
+.PHONY: lint
 lint:
-	golint -set_exit_status $(GOPACKAGES)
+	@golint -set_exit_status $(GOPACKAGES)
 
-test:
-	go test -cover $(GOPACKAGES)
+.PHONY: unit
+unit:
+	@go test -cover -short $(GOPACKAGES)
 
-testshort:
-	go test -short $(GOPACKAGES)
+.PHONY: integration
+integration:
+	@go test -cover -cpu=1,2 -tags integration $(GOPACKAGES)
 
+.PHONY: tools
 tools:
-	go get -u golang.org/x/lint/golint
-	go get -u github.com/kisielk/errcheck
+	@go get -u golang.org/x/lint/golint
 
+.PHONY: vet
 vet:
-	go vet $(GOPACKAGES)
+	@go vet $(GOPACKAGES)
