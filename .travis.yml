@@ -11,7 +11,7 @@ go:
     - tip
 
 before_install:
-    - docker pull andyrbell/mountebank:1.14.0
+    - docker pull andyrbell/mountebank:1.14.1
     - make tools
 
 script:
