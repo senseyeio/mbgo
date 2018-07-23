@@ -12,20 +12,19 @@ $ go get -u github.com/senseyeio/mbgo
 
 ## Testing
 
-This package includes both unit and integration tests, with the integration tests currently tested against a mountebank v1.14.0 instance.
-
-Both types of tests are run by default, but the integration tests can be skipped by testing in short mode:
+This package includes both unit and integration tests. Use the `unit` and `integration` targets in the Makefile to run them, respectively:
 
 ```sh
-$ go test -short
+$ make unit
+$ make integration
 ```
 
-Otherwise, the integration tests' client points to a local Docker container at port 2525, with the additional ports 8080-8083 exposed for communication with the imposter fixtures.
+The integration test client points to a local Docker container at port 2525, with the additional ports 8080-8083 exposed for communication with test imposters. Currently tested against a mountebank v1.14.1 instance.
 
 ## Contributing
 
 * Fork the repository.
 * Code your changes.
 * If applicable, add tests and/or documentation.
-* Please ensure all tests pass and that all code passes `golint`, `go vet` and `errcheck` (see the `Makefile` for more details).
+* Please ensure all unit and integration tests are passing, and that all code passes `make lint` and `make vet`.
 * Raise a new pull request with a short description of your changes.
