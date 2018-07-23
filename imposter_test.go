@@ -154,7 +154,7 @@ func TestImposter_MarshalJSON(t *testing.T) {
 			},
 		},
 		{
-			Description: "should include the jsonpath parameter on the predicate if specified",
+			Description: "should include parameters on the predicate if specified",
 			Imposter: mbgo.Imposter{
 				Port:           8080,
 				Proto:          "http",
@@ -170,9 +170,12 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									Method: http.MethodGet,
 									Path:   "/foo",
 								},
+								// include JSONPath parameter
 								JSONPath: &mbgo.JSONPath{
 									Selector: "$..test",
 								},
+								// include case sensitive parameter
+								CaseSensitive: true,
 							},
 						},
 						Responses: []mbgo.Response{
@@ -201,12 +204,13 @@ func TestImposter_MarshalJSON(t *testing.T) {
 						"predicates": []interface{}{
 							map[string]interface{}{
 								"equals": map[string]interface{}{
-									"method":      http.MethodGet,
-									"path":        "/foo",
+									"method": http.MethodGet,
+									"path":   "/foo",
 								},
 								"jsonpath": map[string]interface{}{
 									"selector": "$..test",
 								},
+								"caseSensitive": true,
 							},
 						},
 						"responses": []interface{}{

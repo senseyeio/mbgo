@@ -167,6 +167,8 @@ type Predicate struct {
 	// JSONPath is the predicate parameter for narrowing the scope of JSON
 	// comparison; leave nil to disable functionality.
 	JSONPath *JSONPath
+	// CaseSensitive determines if the match is case sensitive or not.
+	CaseSensitive bool
 }
 
 // toDTO maps a Predicate value to a predicateDTO value.
@@ -197,6 +199,10 @@ func (p Predicate) toDTO() (predicateDTO, error) {
 			return dto, err
 		}
 		dto["jsonpath"] = b
+	}
+
+	if p.CaseSensitive {
+		dto["caseSensitive"] = []byte("true")
 	}
 
 	return dto, nil
