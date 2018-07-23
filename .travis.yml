@@ -16,6 +16,6 @@ before_install:
 
 script:
     - make lint
-    - make errcheck
     - make vet
-    - make test
+    - make unit
+    - make integration
