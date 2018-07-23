@@ -143,6 +143,16 @@ func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error
 	}
 }
 
+// JSONPath is a predicate parameter used to narrow the scope of a tested value
+// to one found at the specified path in the response JSON.
+//
+// See more information about the JSONPath parameter at:
+// http://www.mbtest.org/docs/api/jsonpath.
+type JSONPath struct {
+	// Selector is the JSON path of the value tested against the predicate.
+	Selector string `json:"selector"`
+}
+
 // Predicate represents conditional behaviour attached to a Stub in order
 // for it to match or not match an incoming request.
 //
@@ -154,6 +164,9 @@ type Predicate struct {
 	// Request is the request value challenged against the Operator;
 	// either of type HTTPRequest or TCPRequest.
 	Request interface{}
+	// JSONPath is the predicate parameter for narrowing the scope of JSON
+	// comparison; leave nil to disable functionality.
+	JSONPath *JSONPath
 }
 
 // toDTO maps a Predicate value to a predicateDTO value.
@@ -177,6 +190,15 @@ func (p Predicate) toDTO() (predicateDTO, error) {
 		return dto, err
 	}
 	dto[p.Operator] = b
+
+	if p.JSONPath != nil {
+		b, err = json.Marshal(p.JSONPath)
+		if err != nil {
+			return dto, err
+		}
+		dto["jsonpath"] = b
+	}
+
 	return dto, nil
 }
 

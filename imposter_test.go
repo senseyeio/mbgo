@@ -153,6 +153,77 @@ func TestImposter_MarshalJSON(t *testing.T) {
 				},
 			},
 		},
+		{
+			Description: "should include the jsonpath parameter on the predicate if specified",
+			Imposter: mbgo.Imposter{
+				Port:           8080,
+				Proto:          "http",
+				Name:           "http_test_imposter",
+				RecordRequests: true,
+				AllowCORS:      true,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "equals",
+								Request: mbgo.HTTPRequest{
+									Method: http.MethodGet,
+									Path:   "/foo",
+								},
+								JSONPath: &mbgo.JSONPath{
+									Selector: "$..test",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+									Headers: map[string]string{
+										"Content-Type": "application/json",
+									},
+									Body: `{"test":true}`,
+								},
+							},
+						},
+					},
+				},
+			},
+			Expected: map[string]interface{}{
+				"port":           8080,
+				"protocol":       "http",
+				"name":           "http_test_imposter",
+				"recordRequests": true,
+				"allowCORS":      true,
+				"stubs": []interface{}{
+					map[string]interface{}{
+						"predicates": []interface{}{
+							map[string]interface{}{
+								"equals": map[string]interface{}{
+									"method":      http.MethodGet,
+									"path":        "/foo",
+								},
+								"jsonpath": map[string]interface{}{
+									"selector": "$..test",
+								},
+							},
+						},
+						"responses": []interface{}{
+							map[string]interface{}{
+								"is": map[string]interface{}{
+									"statusCode": 200,
+									"headers": map[string]string{
+										"Content-Type": "application/json",
+									},
+									"body": `{"test":true}`,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
