@@ -242,9 +242,10 @@ func TestImposter_MarshalJSON(t *testing.T) {
 			testutil.ExpectEqual(t, err, nil)
 
 			var actual, expected map[string]interface{}
-			// these calls cannot fail
-			_ = json.Unmarshal(ab, &actual)
-			_ = json.Unmarshal(eb, &expected)
+			err = json.Unmarshal(ab, &actual)
+			testutil.ExpectEqual(t, err, nil)
+			err = json.Unmarshal(eb, &expected)
+			testutil.ExpectEqual(t, err, nil)
 
 			testutil.ExpectEqual(t, actual, expected)
 		})

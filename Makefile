@@ -1,5 +1,9 @@
 GOPACKAGES := $(shell go list github.com/senseyeio/mbgo/...)
 
+.PHONY: errcheck
+errcheck:
+	@errcheck -asserts -blank -ignore 'io:[cC]lose' $(GOPACKAGES)
+
 .PHONY: fmt
 fmt:
 	@for pkg in $(GOPACKAGES); do go fmt $$pkg; done
@@ -18,4 +22,4 @@ integration:
 
 .PHONY: tools
 tools:
-	@go get -u golang.org/x/lint/golint
+	@go get -u golang.org/x/lint/golint github.com/kisielk/errcheck

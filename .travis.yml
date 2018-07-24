@@ -15,5 +15,6 @@ before_install:
     - make tools
 
 script:
+    - make errcheck
     - make lint
     - make integration
