@@ -19,7 +19,3 @@ integration:
 .PHONY: tools
 tools:
 	@go get -u golang.org/x/lint/golint
-
-.PHONY: vet
-vet:
-	@go vet $(GOPACKAGES)

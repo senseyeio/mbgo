@@ -16,5 +16,4 @@ before_install:
 
 script:
     - make lint
-    - make vet
     - make integration
