@@ -38,7 +38,7 @@ type HTTPRequest struct {
 	// Note that more than one value per key is not supported.
 	Headers map[string]string
 	// Body is the body of the request.
-	Body string
+	Body interface{}
 }
 
 // httpRequestDTO is a data transfer object used as an intermediary value
@@ -49,7 +49,7 @@ type httpRequestDTO struct {
 	Path        string            `json:"path,omitempty"`
 	Query       map[string]string `json:"query,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty"`
-	Body        string            `json:"body,omitempty"`
+	Body        interface{}       `json:"body,omitempty"`
 }
 
 // toDTO maps an HTTPRequest value to a httpRequestDTO value.
