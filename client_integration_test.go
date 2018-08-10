@@ -454,6 +454,7 @@ func TestClient_DeleteRequests(t *testing.T) {
 						Query: map[string]string{
 							"bar": "true",
 						},
+						Body: "",
 					},
 				},
 			},
