@@ -218,7 +218,7 @@ type predicateDTO map[string]json.RawMessage
 // with its Request field set to the appropriate type based on the specified
 // network protocol proto - currently either HTTPRequest or TCPRequest.
 func (dto predicateDTO) unmarshalProto(proto string) (p Predicate, err error) {
-	if len(dto) != 1 {
+	if len(dto) < 1 {
 		err = errors.New("unexpected Predicate JSON structure")
 		return
 	}
