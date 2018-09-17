@@ -228,6 +228,44 @@ func TestImposter_MarshalJSON(t *testing.T) {
 				},
 			},
 		},
+		{
+			Description: "should marshal the expected default response on an http imposter, if provided",
+			Imposter: mbgo.Imposter{
+				Proto: "http",
+				Port:  8080,
+				DefaultResponse: mbgo.HTTPResponse{
+					StatusCode: http.StatusNotImplemented,
+					Mode:       "text",
+					Body:       "not implemented",
+				},
+			},
+			Expected: map[string]interface{}{
+				"protocol": "http",
+				"port":     8080,
+				"defaultResponse": map[string]interface{}{
+					"statusCode": 501,
+					"_mode":      "text",
+					"body":       "not implemented",
+				},
+			},
+		},
+		{
+			Description: "should marshal the expected default response on a tcp imposter, if provided",
+			Imposter: mbgo.Imposter{
+				Proto: "tcp",
+				Port:  8080,
+				DefaultResponse: mbgo.TCPResponse{
+					Data: "not implemented",
+				},
+			},
+			Expected: map[string]interface{}{
+				"protocol": "tcp",
+				"port":     8080,
+				"defaultResponse": map[string]interface{}{
+					"data": "not implemented",
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {

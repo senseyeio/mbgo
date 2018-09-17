@@ -306,12 +306,8 @@ type Response struct {
 	Value interface{}
 }
 
-// toDTO maps a Response value to a responseDTO value; used for json.Marshal.
-func (r Response) toDTO() (responseDTO, error) {
-	dto := responseDTO{}
-
-	var v interface{}
-	switch typ := r.Value.(type) {
+func getResponseSubTypeDTO(v interface{}) (interface{}, error) {
+	switch typ := v.(type) {
 	case HTTPResponse:
 		v = typ.toDTO()
 	case *HTTPResponse:
@@ -320,12 +316,26 @@ func (r Response) toDTO() (responseDTO, error) {
 		v = typ.toDTO()
 	case *TCPResponse:
 		v = typ.toDTO()
+	default:
+		return nil, errors.New("invalid response type")
+	}
+	return v, nil
+}
+
+// toDTO maps a Response value to a responseDTO value; used for json.Marshal.
+func (r Response) toDTO() (responseDTO, error) {
+	dto := responseDTO{}
+
+	v, err := getResponseSubTypeDTO(r.Value)
+	if err != nil {
+		return dto, err
 	}
 
 	b, err := json.Marshal(v)
 	if err != nil {
 		return dto, err
 	}
+
 	dto[r.Type] = b
 	return dto, nil
 }
@@ -484,6 +494,9 @@ type Imposter struct {
 	RequestCount int
 	// AllowCORS will allow all CORS pre-flight requests on the Imposter.
 	AllowCORS bool
+	// DefaultResponse is the default response to send if no predicate matches.
+	// Only used by HTTP and TCP Imposters; should be one of HTTPResponse or TCPResponse.
+	DefaultResponse interface{}
 	// Stubs contains zero or more valid Stubs associated with the Imposter.
 	Stubs []Stub
 }
@@ -520,6 +533,13 @@ func (imp Imposter) MarshalJSON() ([]byte, error) {
 	}
 	if imp.AllowCORS {
 		m["allowCORS"] = imp.AllowCORS
+	}
+	if imp.DefaultResponse != nil {
+		v, err := getResponseSubTypeDTO(imp.DefaultResponse)
+		if err != nil {
+			return nil, err
+		}
+		m["defaultResponse"] = v
 	}
 	return json.Marshal(&m)
 }
