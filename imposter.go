@@ -239,8 +239,8 @@ type HTTPResponse struct {
 	StatusCode int
 	// Headers are the HTTP headers in the response.
 	Headers map[string]string
-	// Body is the body of the response.
-	Body string
+	// Body is the body of the response. It will be JSON encoded before sending to mountebank
+	Body interface{}
 	// Mode is the mode of the response; either "text" or "binary".
 	// Defaults to "text" if excluded.
 	Mode string
@@ -251,7 +251,7 @@ type HTTPResponse struct {
 type httpResponseDTO struct {
 	StatusCode int               `json:"statusCode,omitempty"`
 	Headers    map[string]string `json:"headers,omitempty"`
-	Body       string            `json:"body,omitempty"`
+	Body       interface{}       `json:"body,omitempty"`
 	Mode       string            `json:"_mode,omitempty"`
 }
 
