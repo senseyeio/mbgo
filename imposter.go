@@ -39,6 +39,8 @@ type HTTPRequest struct {
 	Headers map[string]string
 	// Body is the body of the request.
 	Body interface{}
+	// Timestamp is the timestamp of the request.
+	Timestamp string
 }
 
 // httpRequestDTO is a data transfer object used as an intermediary value
@@ -50,6 +52,7 @@ type httpRequestDTO struct {
 	Query       map[string]string `json:"query,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty"`
 	Body        interface{}       `json:"body,omitempty"`
+	Timestamp   string            `json:"timestamp,omitempty"`
 }
 
 // toDTO maps an HTTPRequest value to a httpRequestDTO value.
@@ -63,6 +66,7 @@ func (r HTTPRequest) toDTO() httpRequestDTO {
 	dto.Query = r.Query
 	dto.Headers = r.Headers
 	dto.Body = r.Body
+	dto.Timestamp = r.Timestamp
 	return dto
 }
 
@@ -117,6 +121,7 @@ func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error
 			Query:       dto.Query,
 			Headers:     dto.Headers,
 			Body:        dto.Body,
+			Timestamp:   dto.Timestamp,
 		}
 		return
 
