@@ -454,7 +454,8 @@ func TestClient_DeleteRequests(t *testing.T) {
 						Query: map[string]string{
 							"bar": "true",
 						},
-						Body: "",
+						Body:      "",
+						Timestamp: "",
 					},
 				},
 			},
@@ -469,6 +470,19 @@ func TestClient_DeleteRequests(t *testing.T) {
 
 			actual, err := mb.DeleteRequests(c.Port)
 			testutil.ExpectEqual(t, err, c.Err)
+
+			for i := 0; i < len(actual.Requests); i++ {
+				req := actual.Requests[i].(mbgo.HTTPRequest)
+				ts := req.Timestamp
+				if len(ts) == 0 {
+					t.Errorf("expected non-empty timestamp in %v", req)
+				}
+				// clear out the timestamp before doing a deep equality check
+				// see https://github.com/senseyeio/mbgo/pull/5 for details
+				req.Timestamp = ""
+				actual.Requests[i] = req
+			}
+
 			testutil.ExpectEqual(t, actual, c.Expected)
 
 			if c.After != nil {

@@ -97,6 +97,7 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									Headers: map[string]string{
 										"Accept": "application/json",
 									},
+									Timestamp: "2018-10-10T09:12:08.075Z",
 								},
 							},
 						},
@@ -135,6 +136,7 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									"headers": map[string]string{
 										"Accept": "application/json",
 									},
+									"timestamp": "2018-10-10T09:12:08.075Z",
 								},
 							},
 						},
@@ -184,7 +186,7 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									Headers: map[string]string{
 										"Content-Type": "application/json",
 									},
-									Body: struct{
+									Body: struct {
 										Test bool `json:"test"`
 									}{
 										Test: true,
