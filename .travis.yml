@@ -8,10 +8,11 @@ language: go
 go:
     - 1.9
     - "1.10"
+    - "1.11"
     - tip
 
 before_install:
-    - docker pull andyrbell/mountebank:1.14.1
+    - make pull
     - make tools
 
 script:

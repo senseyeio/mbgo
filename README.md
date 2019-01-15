@@ -19,12 +19,13 @@ $ make unit
 $ make integration
 ```
 
-The integration test client points to a local Docker container at port 2525, with the additional ports 8080-8083 exposed for communication with test imposters. Currently tested against a mountebank v1.14.1 instance.
+The integration test client points to a local Docker container at port 2525, with the additional ports 8080-8083 exposed for communication with test imposters. Currently tested against a mountebank v1.16.0 instance.
 
 ## Contributing
 
 * Fork the repository.
 * Code your changes.
 * If applicable, add tests and/or documentation.
-* Please ensure all unit and integration tests are passing, and that all code passes `make lint` and `make vet`.
+* Please ensure all unit and integration tests are passing, and that all code passes `make lint`.
 * Raise a new pull request with a short description of your changes.
+* Use the following convention for branch naming: `<username>/<description-with-dashes>`. For instance, `smotes/add-smtp-imposters`.
