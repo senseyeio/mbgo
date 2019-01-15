@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 
 	ctx := context.Background()
 	cli := mustNewDockerClient()
-	image := "andyrbell/mountebank:1.14.1"
+	image := "andyrbell/mountebank:1.16.0"
 
 	var (
 		id  string
@@ -80,7 +80,7 @@ func TestClient_Logs(t *testing.T) {
 	vs, err := mb.Logs(-1, -1)
 	testutil.ExpectEqual(t, err, nil)
 	testutil.ExpectEqual(t, len(vs) >= 2, true)
-	testutil.ExpectEqual(t, vs[0].Message, "[mb:2525] mountebank v1.14.1 now taking orders - point your browser to http://localhost:2525 for help")
+	testutil.ExpectEqual(t, vs[0].Message, "[mb:2525] mountebank v1.16.0 now taking orders - point your browser to http://localhost:2525 for help")
 	testutil.ExpectEqual(t, vs[1].Message, "[mb:2525] GET /logs")
 }
 
@@ -440,7 +440,7 @@ func TestClient_DeleteRequests(t *testing.T) {
 				Port:         8080,
 				Proto:        "http",
 				Name:         "delete_requests_test",
-				RequestCount: 0,
+				RequestCount: 1,
 				Requests: []interface{}{
 					mbgo.HTTPRequest{
 						RequestFrom: net.IPv4(172, 17, 0, 1),
@@ -497,7 +497,7 @@ func TestClient_Config(t *testing.T) {
 
 	cfg, err := mb.Config()
 	testutil.ExpectEqual(t, err, nil)
-	testutil.ExpectEqual(t, cfg.Version, "1.14.1")
+	testutil.ExpectEqual(t, cfg.Version, "1.16.0")
 }
 
 func TestClient_Imposters(t *testing.T) {

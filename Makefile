@@ -12,6 +12,10 @@ fmt:
 lint:
 	@golint -set_exit_status $(GOPACKAGES)
 
+.PHONY: pull
+pull:
+	@docker pull andyrbell/mountebank:1.16.0
+
 .PHONY: unit
 unit:
 	@go test -cover -short $(GOPACKAGES)
