@@ -317,7 +317,7 @@ type Response struct {
 
 // Behaviors defines the possible response behaviors for a stub.
 // Currently supported values are:
-// wait (milliseconds)
+// wait - Adds latency to a response by waiting a specified number of milliseconds before sending the response.
 // See more information on stub response behaviors in mountebank at:
 // http://www.mbtest.org/docs/api/behaviors.
 type Behaviors struct {
