@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const behaviorsKey = "_behaviors"
+
 func parseHybridAddress(s string) (ip net.IP, err error) {
 	parts := strings.Split(s, ":")
 	ipStr := strings.Join(parts[0:len(parts)-1], ":")
@@ -309,6 +311,17 @@ type Response struct {
 	Type string
 	// Value is the value of the Response; either of type HTTPResponse or TCPResponse.
 	Value interface{}
+	// Behaviors is an optional field allowing the user to define response behavior.
+	Behaviors *Behaviors
+}
+
+// Behaviors defines the possible response behaviors for a stub.
+// Currently supported values are:
+// wait - Adds latency to a response by waiting a specified number of milliseconds before sending the response.
+// See more information on stub response behaviors in mountebank at:
+// http://www.mbtest.org/docs/api/behaviors.
+type Behaviors struct {
+	Wait int `json:"wait,omitempty"`
 }
 
 func getResponseSubTypeDTO(v interface{}) (interface{}, error) {
@@ -342,6 +355,15 @@ func (r Response) toDTO() (responseDTO, error) {
 	}
 
 	dto[r.Type] = b
+
+	if r.Behaviors != nil {
+		behaviors, err := json.Marshal(r.Behaviors)
+		if err != nil {
+			return dto, err
+		}
+		dto[behaviorsKey] = behaviors
+	}
+
 	return dto, nil
 }
 
@@ -356,8 +378,12 @@ type responseDTO map[string]json.RawMessage
 // network protocol proto - currently either type HTTPResponse or TCPResponse.
 func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 	if len(dto) != 1 {
-		err = errors.New("unexpected Predicate JSON structure")
-		return
+		if len(dto) == 2 {
+			if _, ok := dto[behaviorsKey]; !ok {
+				err = errors.New("unexpected Predicate JSON structure")
+				return
+			}
+		}
 	}
 
 	for key, b := range dto {

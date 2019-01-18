@@ -111,6 +111,9 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									},
 									Body: `{"test":true}`,
 								},
+								Behaviors: &mbgo.Behaviors{
+									Wait: 500,
+								},
 							},
 						},
 					},
@@ -148,6 +151,9 @@ func TestImposter_MarshalJSON(t *testing.T) {
 										"Content-Type": "application/json",
 									},
 									"body": `{"test":true}`,
+								},
+								"_behaviors": map[string]interface{}{
+									"wait": 500,
 								},
 							},
 						},
