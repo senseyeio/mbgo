@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/senseyeio/mbgo/internal/assert"
 	"github.com/senseyeio/mbgo/internal/rest"
-	"github.com/senseyeio/mbgo/internal/testutil"
 )
 
 func TestClient_NewRequest(t *testing.T) {
@@ -132,8 +132,8 @@ func TestClient_NewRequest(t *testing.T) {
 
 			cli := rest.NewClient(nil, c.Root)
 			req, err := cli.NewRequest(c.Method, c.Path, c.Body, c.Query)
-			testutil.ExpectEqual(t, err, c.Err)
-			testutil.ExpectEqual(t, req, c.Request)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, req, c.Request)
 		})
 	}
 }
@@ -186,8 +186,8 @@ func TestClient_DecodeResponseBody(t *testing.T) {
 
 			cli := rest.NewClient(nil, nil)
 			err := cli.DecodeResponseBody(c.Body, c.Value)
-			testutil.ExpectEqual(t, err, c.Err)
-			testutil.ExpectEqual(t, c.Value, c.Expected)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, c.Value, c.Expected)
 		})
 	}
 }

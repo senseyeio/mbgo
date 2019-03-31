@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/senseyeio/mbgo"
-	"github.com/senseyeio/mbgo/internal/testutil"
+	"github.com/senseyeio/mbgo/internal/assert"
 )
 
 func TestImposter_MarshalJSON(t *testing.T) {
@@ -360,17 +360,17 @@ func TestImposter_MarshalJSON(t *testing.T) {
 			t.Parallel()
 
 			ab, err := json.Marshal(c.Imposter)
-			testutil.ExpectEqual(t, err, c.Err)
+			assert.Equals(t, err, c.Err)
 			eb, err := json.Marshal(c.Expected)
-			testutil.ExpectEqual(t, err, nil)
+			assert.Equals(t, err, nil)
 
 			var actual, expected map[string]interface{}
 			err = json.Unmarshal(ab, &actual)
-			testutil.ExpectEqual(t, err, nil)
+			assert.Equals(t, err, nil)
 			err = json.Unmarshal(eb, &expected)
-			testutil.ExpectEqual(t, err, nil)
+			assert.Equals(t, err, nil)
 
-			testutil.ExpectEqual(t, actual, expected)
+			assert.Equals(t, actual, expected)
 		})
 	}
 }
@@ -535,8 +535,8 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 
 			actual := mbgo.Imposter{}
 			err = json.Unmarshal(b, &actual)
-			testutil.ExpectEqual(t, err, c.Err)
-			testutil.ExpectEqual(t, actual, c.Expected)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
 		})
 	}
 }
