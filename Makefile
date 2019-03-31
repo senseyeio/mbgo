@@ -1,4 +1,4 @@
-GOPACKAGES := $(shell go list github.com/senseyeio/mbgo/...)
+GOPACKAGES := $(shell go list ./...)
 
 .PHONY: errcheck
 errcheck:
@@ -6,24 +6,20 @@ errcheck:
 
 .PHONY: fmt
 fmt:
-	@for pkg in $(GOPACKAGES); do go fmt $$pkg; done
+	@go fmt $(PACKAGES)
+
+.PHONY: integration
+integration:
+	@go test -cover -tags=integration -timeout=5s $(GOPACKAGES)
 
 .PHONY: lint
 lint:
 	@golint -set_exit_status $(GOPACKAGES)
 
-.PHONY: pull
-pull:
-	@docker pull andyrbell/mountebank:1.16.0
-
-.PHONY: unit
-unit:
-	@go test -cover -short $(GOPACKAGES)
-
-.PHONY: integration
-integration:
-	@go test -cover -cpu=1,2 -tags integration $(GOPACKAGES)
-
 .PHONY: tools
 tools:
 	@go get -u golang.org/x/lint/golint github.com/kisielk/errcheck
+
+.PHONY: unit
+unit:
+	@go test -cover -timeout=1s $(GOPACKAGES)
