@@ -30,7 +30,7 @@ func TestClient_Logs(t *testing.T) {
 	vs, err := mb.Logs(-1, -1)
 	assert.Equals(t, err, nil)
 	assert.Equals(t, len(vs) >= 2, true)
-	assert.Equals(t, vs[0].Message, "[mb:2525] mountebank v1.16.0 now taking orders - point your browser to http://localhost:2525 for help")
+	assert.Equals(t, vs[0].Message, "[mb:2525] mountebank v2.0.0 now taking orders - point your browser to http://localhost:2525/ for help")
 	assert.Equals(t, vs[1].Message, "[mb:2525] GET /logs")
 }
 
@@ -423,7 +423,7 @@ func TestClient_Config(t *testing.T) {
 
 	cfg, err := mb.Config()
 	assert.Equals(t, err, nil)
-	assert.Equals(t, cfg.Version, "1.16.0")
+	assert.Equals(t, cfg.Version, "2.0.0")
 }
 
 func TestClient_Imposters(t *testing.T) {
