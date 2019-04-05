@@ -19,10 +19,6 @@ integration:
 lint:
 	@golint -set_exit_status $(GOPACKAGES)
 
-.PHONY: tools
-tools:
-	@go get -u golang.org/x/lint/golint github.com/kisielk/errcheck
-
 .PHONY: unit
 unit:
 	@go test -cover -timeout=1s $(GOPACKAGES)
