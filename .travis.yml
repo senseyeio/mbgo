@@ -14,7 +14,11 @@ before_install:
     - make tools
     - docker run -d --rm --name=mountebank -p 2525:2525 -p 8080:8080 -p 8081:8081 andyrbell/mountebank:2.0.0
 
-script:
-    - make errcheck
-    - make lint
-    - make integration
+jobs:
+    include:
+        - stage: test
+          script: make integration
+          # only run source code analysis tools on latest version of Go
+        - stage: check
+          script: make lint && make errcheck
+          go: "1.12"
