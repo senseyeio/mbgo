@@ -15,15 +15,11 @@ jobs:
         - stage: test
           before_install:
               - docker pull andyrbell/mountebank:2.0.0
-          script:
-              - make unit
-              - make integration
+          script: make unit && make integration
           # only run source code analysis tools on latest version of Go
         - stage: check
           go: "1.12"
           before_install:
               - go get golang.org/x/lint/golint
               - go get github.com/kisielk/errcheck
-          script:
-              - make lint
-              - make errcheck
+          script: make lint && make errcheck
