@@ -1,5 +1,8 @@
 GOPACKAGES := $(shell go list ./...)
 
+.PHONY: default
+default: fmt lint unit
+
 .PHONY: errcheck
 errcheck:
 	@errcheck -asserts -blank -ignore 'io:[cC]lose' $(GOPACKAGES)
