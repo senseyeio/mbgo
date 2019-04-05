@@ -13,7 +13,7 @@ fmt:
 
 .PHONY: integration
 integration:
-	@go test -cover -tags=integration -timeout=5s $(GOPACKAGES)
+	./scripts/integration_test.sh $(GOPACKAGES)
 
 .PHONY: lint
 lint:

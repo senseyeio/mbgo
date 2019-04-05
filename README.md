@@ -19,9 +19,9 @@ $ make unit
 $ make integration
 ```
 
-The integration test client expects a version of mountebank running at `localhost:2525`, with the additional ports 8080-8081 exposed for test imposters.
-
-Currently tested against a mountebank v2.0.0 instance using the [andyrbell/mountebank](https://hub.docker.com/r/andyrbell/mountebank) image on DockerHub.
+The integration tests expect Docker to be available on the host, using it to run a local mountebank container at 
+`localhost:2525`, with the additional ports 8080-8081 exposed for test imposters. Currently tested against a mountebank 
+v2.0.0 instance using the [andyrbell/mountebank](https://hub.docker.com/r/andyrbell/mountebank) image on DockerHub.
 
 ## Contributing
 

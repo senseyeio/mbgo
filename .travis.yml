@@ -14,8 +14,9 @@ jobs:
     include:
         - stage: test
           before_install:
-              - docker run -d --rm --name=mountebank -p 2525:2525 -p 8080:8080 -p 8081:8081 andyrbell/mountebank:2.0.0
+              - docker pull andyrbell/mountebank:2.0.0
           script:
+              - make unit
               - make integration
           # only run source code analysis tools on latest version of Go
         - stage: check
