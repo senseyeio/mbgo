@@ -3,95 +3,45 @@
 package mbgo_test
 
 import (
-	"context"
 	"errors"
-	"flag"
-	"log"
-	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/senseyeio/mbgo"
-	"github.com/senseyeio/mbgo/internal/testutil"
-
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
+	"github.com/senseyeio/mbgo/internal/assert"
 )
 
-func TestMain(m *testing.M) {
-	// must parse flags to get -short flag; not parsed before TestMain by default
-	flag.Parse()
-
-	var code int
-	defer func() {
-		if err := recover(); err != nil {
-			log.Printf("caught test panic: %v", err)
-			code = 1
-		}
-		os.Exit(code)
-	}()
-
-	ctx := context.Background()
-	cli := mustNewDockerClient()
-	image := "andyrbell/mountebank:1.16.0"
-
-	var (
-		id  string
-		err error
-	)
-
-	// setup a mountebank Docker container for integration tests
-	if err = pullDockerImage(ctx, cli, image, time.Second*45); err != nil {
-		panic(err)
-	}
-	id, err = createDockerContainer(ctx, cli, image, time.Second*5)
-	if err != nil {
-		panic(err)
-	}
-	if err = startDockerContainer(ctx, cli, id, time.Second*3); err != nil {
-		panic(err)
-	}
-	if err = waitHealthyDockerContainer(ctx, cli, id, time.Second*10); err != nil {
-		panic(err)
-	}
-
-	// Always stop/remove the test container, even on test failure or panic.
-	defer func() {
-		if err = stopDockerContainer(ctx, cli, id, time.Second*3); err != nil {
-			panic(err)
-		}
-		if err = removeDockerContainer(ctx, cli, id, time.Second*3); err != nil {
-			panic(err)
-		}
-	}()
-
-	// run the main test cases
-	code = m.Run()
+// newMountebankClient creates a new mountebank client instance pointing to the host
+// denoted by the MB_HOST environment variable, or localhost:2525 if blank.
+func newMountebankClient() *mbgo.Client {
+	return mbgo.NewClient(&http.Client{
+		Timeout: time.Second,
+	}, &url.URL{
+		Scheme: "http",
+		Host:   "localhost:2525",
+	})
 }
 
 func TestClient_Logs(t *testing.T) {
-	mb := newMountebankClient(nil)
+	mb := newMountebankClient()
 
 	vs, err := mb.Logs(-1, -1)
-	testutil.ExpectEqual(t, err, nil)
-	testutil.ExpectEqual(t, len(vs) >= 2, true)
-	testutil.ExpectEqual(t, vs[0].Message, "[mb:2525] mountebank v1.16.0 now taking orders - point your browser to http://localhost:2525 for help")
-	testutil.ExpectEqual(t, vs[1].Message, "[mb:2525] GET /logs")
+	assert.Equals(t, err, nil)
+	assert.Equals(t, len(vs) >= 2, true)
+	assert.Equals(t, vs[0].Message, "[mb:2525] mountebank v2.0.0 now taking orders - point your browser to http://localhost:2525/ for help")
+	assert.Equals(t, vs[1].Message, "[mb:2525] GET /logs")
 }
 
 func TestClient_Create(t *testing.T) {
-	mb := newMountebankClient(nil)
+	mb := newMountebankClient()
 
 	cases := []struct {
 		// general
 		Description string
-		Before      func(*mbgo.Client)
-		After       func(*mbgo.Client)
+		Before      func(*testing.T, *mbgo.Client)
+		After       func(*testing.T, *mbgo.Client)
 
 		// input
 		Input mbgo.Imposter
@@ -156,14 +106,14 @@ func TestClient_Create(t *testing.T) {
 					},
 				},
 			},
-			Before: func(mb *mbgo.Client) {
+			Before: func(t *testing.T, mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
+				assert.Equals(t, err, nil)
 			},
-			After: func(mb *mbgo.Client) {
+			After: func(t *testing.T, mb *mbgo.Client) {
 				imp, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
-				testutil.ExpectEqual(t, imp.Name, "create_test")
+				assert.Equals(t, err, nil)
+				assert.Equals(t, imp.Name, "create_test")
 			},
 			Expected: &mbgo.Imposter{
 				Proto:          "http",
@@ -210,28 +160,28 @@ func TestClient_Create(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			if c.Before != nil {
-				c.Before(mb)
+				c.Before(t, mb)
 			}
 
 			actual, err := mb.Create(c.Input)
-			testutil.ExpectEqual(t, err, c.Err)
-			testutil.ExpectEqual(t, actual, c.Expected)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
 
 			if c.After != nil {
-				c.After(mb)
+				c.After(t, mb)
 			}
 		})
 	}
 }
 
 func TestClient_Imposter(t *testing.T) {
-	mb := newMountebankClient(nil)
+	mb := newMountebankClient()
 
 	cases := []struct {
 		// general
 		Description string
-		Before      func(*mbgo.Client)
-		After       func(*mbgo.Client)
+		Before      func(*testing.T, *mbgo.Client)
+		After       func(*testing.T, *mbgo.Client)
 
 		// input
 		Port   int
@@ -244,17 +194,17 @@ func TestClient_Imposter(t *testing.T) {
 		{
 			Description: "should error if an Imposter does not exist on the specified port",
 			Port:        8080,
-			Before: func(mb *mbgo.Client) {
+			Before: func(t *testing.T, mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
+				assert.Equals(t, err, nil)
 			},
 			Err: errors.New("no such resource: Try POSTing to /imposters first?"),
 		},
 		{
 			Description: "should return the expected TCP Imposter if it exists on the specified port",
-			Before: func(mb *mbgo.Client) {
+			Before: func(t *testing.T, mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
+				assert.Equals(t, err, nil)
 
 				imp, err := mb.Create(mbgo.Imposter{
 					Port:           8080,
@@ -282,13 +232,13 @@ func TestClient_Imposter(t *testing.T) {
 						},
 					},
 				})
-				testutil.ExpectEqual(t, err, nil)
-				testutil.ExpectEqual(t, imp.Name, "imposter_test")
+				assert.Equals(t, err, nil)
+				assert.Equals(t, imp.Name, "imposter_test")
 			},
-			After: func(mb *mbgo.Client) {
+			After: func(t *testing.T, mb *mbgo.Client) {
 				imp, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
-				testutil.ExpectEqual(t, imp.Name, "imposter_test")
+				assert.Equals(t, err, nil)
+				assert.Equals(t, imp.Name, "imposter_test")
 			},
 			Port:   8080,
 			Replay: false,
@@ -325,22 +275,22 @@ func TestClient_Imposter(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			if c.Before != nil {
-				c.Before(mb)
+				c.Before(t, mb)
 			}
 
 			actual, err := mb.Imposter(c.Port, c.Replay)
-			testutil.ExpectEqual(t, err, c.Err)
-			testutil.ExpectEqual(t, actual, c.Expected)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
 
 			if c.After != nil {
-				c.After(mb)
+				c.After(t, mb)
 			}
 		})
 	}
 }
 
 func TestClient_Delete(t *testing.T) {
-	mb := newMountebankClient(nil)
+	mb := newMountebankClient()
 
 	cases := []struct {
 		// general
@@ -361,7 +311,7 @@ func TestClient_Delete(t *testing.T) {
 			Port:        8080,
 			Before: func(mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
+				assert.Equals(t, err, nil)
 			},
 			Expected: &mbgo.Imposter{},
 		},
@@ -374,8 +324,8 @@ func TestClient_Delete(t *testing.T) {
 			}
 
 			actual, err := mb.Delete(c.Port, c.Replay)
-			testutil.ExpectEqual(t, err, c.Err)
-			testutil.ExpectEqual(t, actual, c.Expected)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
 
 			if c.After != nil {
 				c.After(mb)
@@ -385,13 +335,13 @@ func TestClient_Delete(t *testing.T) {
 }
 
 func TestClient_DeleteRequests(t *testing.T) {
-	mb := newMountebankClient(nil)
+	mb := newMountebankClient()
 
 	cases := []struct {
 		// general
 		Description string
-		Before      func(*mbgo.Client)
-		After       func(*mbgo.Client)
+		Before      func(*testing.T, *mbgo.Client)
+		After       func(*testing.T, *mbgo.Client)
 
 		// input
 		Port int
@@ -402,18 +352,18 @@ func TestClient_DeleteRequests(t *testing.T) {
 	}{
 		{
 			Description: "should return an empty Imposter struct if one is not configured on the specified port",
-			Before: func(mb *mbgo.Client) {
+			Before: func(t *testing.T, mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
+				assert.Equals(t, err, nil)
 			},
 			Port:     8080,
 			Expected: &mbgo.Imposter{},
 		},
 		{
 			Description: "should return the expected Imposter if it exists on successful deletion",
-			Before: func(mb *mbgo.Client) {
+			Before: func(t *testing.T, mb *mbgo.Client) {
 				_, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
+				assert.Equals(t, err, nil)
 
 				_, err = mb.Create(mbgo.Imposter{
 					Port:           8080,
@@ -421,43 +371,19 @@ func TestClient_DeleteRequests(t *testing.T) {
 					Name:           "delete_requests_test",
 					RecordRequests: true,
 				})
-				testutil.ExpectEqual(t, err, nil)
-
-				// make some HTTP requests to the new Imposter
-				for i := 0; i < 1; i++ {
-					resp, err := http.Get("http://localhost:8080/foo?bar=true")
-					testutil.ExpectEqual(t, err, nil)
-					testutil.ExpectEqual(t, resp.StatusCode, http.StatusOK)
-				}
+				assert.Equals(t, err, nil)
 			},
-			After: func(mb *mbgo.Client) {
+			After: func(t *testing.T, mb *mbgo.Client) {
 				imp, err := mb.Delete(8080, false)
-				testutil.ExpectEqual(t, err, nil)
-				testutil.ExpectEqual(t, imp.Name, "delete_requests_test")
+				assert.Equals(t, err, nil)
+				assert.Equals(t, imp.Name, "delete_requests_test")
 			},
 			Port: 8080,
 			Expected: &mbgo.Imposter{
 				Port:         8080,
 				Proto:        "http",
 				Name:         "delete_requests_test",
-				RequestCount: 1,
-				Requests: []interface{}{
-					mbgo.HTTPRequest{
-						RequestFrom: net.IPv4(172, 17, 0, 1),
-						Method:      http.MethodGet,
-						Path:        "/foo",
-						Headers: map[string]string{
-							"Host":            "localhost:8080",
-							"User-Agent":      "Go-http-client/1.1",
-							"Accept-Encoding": "gzip",
-						},
-						Query: map[string]string{
-							"bar": "true",
-						},
-						Body:      "",
-						Timestamp: "",
-					},
-				},
+				RequestCount: 0,
 			},
 		},
 	}
@@ -465,11 +391,11 @@ func TestClient_DeleteRequests(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			if c.Before != nil {
-				c.Before(mb)
+				c.Before(t, mb)
 			}
 
 			actual, err := mb.DeleteRequests(c.Port)
-			testutil.ExpectEqual(t, err, c.Err)
+			assert.Equals(t, err, c.Err)
 
 			for i := 0; i < len(actual.Requests); i++ {
 				req := actual.Requests[i].(mbgo.HTTPRequest)
@@ -483,29 +409,29 @@ func TestClient_DeleteRequests(t *testing.T) {
 				actual.Requests[i] = req
 			}
 
-			testutil.ExpectEqual(t, actual, c.Expected)
+			assert.Equals(t, actual, c.Expected)
 
 			if c.After != nil {
-				c.After(mb)
+				c.After(t, mb)
 			}
 		})
 	}
 }
 
 func TestClient_Config(t *testing.T) {
-	mb := newMountebankClient(nil)
+	mb := newMountebankClient()
 
 	cfg, err := mb.Config()
-	testutil.ExpectEqual(t, err, nil)
-	testutil.ExpectEqual(t, cfg.Version, "1.16.0")
+	assert.Equals(t, err, nil)
+	assert.Equals(t, cfg.Version, "2.0.0")
 }
 
 func TestClient_Imposters(t *testing.T) {
 	cases := []struct {
 		// general
 		Description string
-		Before      func(*mbgo.Client)
-		After       func(*mbgo.Client)
+		Before      func(*testing.T, *mbgo.Client)
+		After       func(*testing.T, *mbgo.Client)
 
 		// input
 		Replay bool
@@ -516,9 +442,9 @@ func TestClient_Imposters(t *testing.T) {
 	}{
 		{
 			Description: "should return a minimal representation of all registered Imposters",
-			Before: func(mb *mbgo.Client) {
+			Before: func(t *testing.T, mb *mbgo.Client) {
 				_, err := mb.DeleteAll(false)
-				testutil.ExpectEqual(t, err, nil)
+				assert.Equals(t, err, nil)
 
 				// create a tcp imposter
 				imp, err := mb.Create(mbgo.Imposter{
@@ -547,8 +473,8 @@ func TestClient_Imposters(t *testing.T) {
 						},
 					},
 				})
-				testutil.ExpectEqual(t, err, nil)
-				testutil.ExpectEqual(t, imp.Name, "imposters_tcp_test")
+				assert.Equals(t, err, nil)
+				assert.Equals(t, imp.Name, "imposters_tcp_test")
 
 				// and an http imposter
 				imp, err = mb.Create(mbgo.Imposter{
@@ -589,8 +515,8 @@ func TestClient_Imposters(t *testing.T) {
 						},
 					},
 				})
-				testutil.ExpectEqual(t, err, nil)
-				testutil.ExpectEqual(t, imp.Name, "imposters_http_test")
+				assert.Equals(t, err, nil)
+				assert.Equals(t, imp.Name, "imposters_http_test")
 			},
 			Expected: []mbgo.Imposter{
 				{
@@ -607,116 +533,21 @@ func TestClient_Imposters(t *testing.T) {
 		},
 	}
 
-	mb := newMountebankClient(nil)
+	mb := newMountebankClient()
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			if c.Before != nil {
-				c.Before(mb)
+				c.Before(t, mb)
 			}
 
 			actual, err := mb.Imposters(c.Replay)
-			testutil.ExpectEqual(t, err, c.Err)
-			testutil.ExpectEqual(t, actual, c.Expected)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
 
 			if c.After != nil {
-				c.After(mb)
+				c.After(t, mb)
 			}
 		})
 	}
-}
-
-func mustNewDockerClient() *client.Client {
-	cli, err := client.NewEnvClient()
-	if err != nil {
-		panic(err)
-	}
-	return cli
-}
-
-func newMountebankClient(u *url.URL) *mbgo.Client {
-	return mbgo.NewClient(&http.Client{
-		Timeout: time.Second,
-	}, u)
-}
-
-func pullDockerImage(ctx context.Context, cli *client.Client, name string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	_, err := cli.ImagePull(ctx, name, types.ImagePullOptions{})
-	return err
-}
-
-func createDockerContainer(ctx context.Context, cli *client.Client, image string, timeout time.Duration) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: image,
-		Cmd:   []string{"mb", "--mock", "--debug"},
-		ExposedPorts: nat.PortSet{
-			"2525/tcp": struct{}{},
-			"8080/tcp": struct{}{},
-		},
-		Healthcheck: &container.HealthConfig{
-			Test:     []string{"CMD", "nc", "-z", "localhost", "2525"},
-			Interval: time.Millisecond * 100,
-			Retries:  50,
-		},
-	}, &container.HostConfig{
-		PortBindings: nat.PortMap{
-			"2525/tcp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: "2525"},
-			},
-			"8080/tcp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: "8080"},
-			},
-		},
-	}, nil, "mbgo_integration_test")
-	if err != nil {
-		return "", err
-	}
-	return resp.ID, nil
-}
-
-func startDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	return cli.ContainerStart(ctx, id, types.ContainerStartOptions{})
-}
-
-func waitHealthyDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	for {
-		dto, err := cli.ContainerInspect(ctx, id)
-		if err != nil {
-			return err
-		}
-
-		// block until the container is healthy
-		if !dto.State.Running || dto.State.Health.Status != "healthy" {
-			time.Sleep(time.Millisecond * 100)
-			continue
-		}
-		break
-	}
-	return nil
-}
-
-func stopDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	return cli.ContainerStop(ctx, id, &timeout)
-}
-
-func removeDockerContainer(ctx context.Context, cli *client.Client, id string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	return cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{})
 }
