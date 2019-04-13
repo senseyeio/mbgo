@@ -1,21 +1,20 @@
 sudo: required
 
 services:
-    - docker
+  - docker
 
 language: go
 
 go:
-    - "1.10"
-    - "1.11"
-    - "1.12"
+  - "1.10"
+  - "1.11"
+  - "1.12"
+
+script: make unit && make integration
 
 jobs:
-    include:
-        - stage: test
-          script: make unit && make integration
-          # only run source code analysis tools on latest version of Go
-        - stage: check
-          go: "1.12"
-          install: go get golang.org/x/lint/golint github.com/kisielk/errcheck
-          script: make lint && make errcheck
+  include:
+    - stage: check
+      install: go get golang.org/x/lint/golint github.com/kisielk/errcheck
+      script: make lint && make errcheck
+      go: "1.12" # only run source code analysis tools on latest version of Go
