@@ -13,7 +13,7 @@ fmt:
 
 .PHONY: integration
 integration:
-	./scripts/integration_test.sh $(GOPACKAGES)
+	@sh ./scripts/integration_test.sh $(GOPACKAGES)
 
 .PHONY: lint
 lint:
