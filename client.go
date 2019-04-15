@@ -3,6 +3,7 @@ package mbgo
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,14 +63,14 @@ func (cli *Client) decodeError(body io.ReadCloser) error {
 //
 // See more information on this resource at:
 // http://www.mbtest.org/docs/api/overview#post-imposters.
-func (cli *Client) Create(imp Imposter) (*Imposter, error) {
+func (cli *Client) Create(ctx context.Context, imp Imposter) (*Imposter, error) {
 	p := "/imposters"
 	b, err := json.Marshal(&imp)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := cli.restCli.NewRequest(http.MethodPost, p, bytes.NewReader(b), nil)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodPost, p, bytes.NewReader(b), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -98,12 +99,12 @@ func (cli *Client) Create(imp Imposter) (*Imposter, error) {
 //
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#get-imposter.
-func (cli *Client) Imposter(port int, replay bool) (*Imposter, error) {
+func (cli *Client) Imposter(ctx context.Context, port int, replay bool) (*Imposter, error) {
 	p := fmt.Sprintf("/imposters/%d", port)
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, vs)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodGet, p, nil, vs)
 	if err != nil {
 		return nil, err
 	}
@@ -131,12 +132,12 @@ func (cli *Client) Imposter(port int, replay bool) (*Imposter, error) {
 //
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#delete-imposter.
-func (cli *Client) Delete(port int, replay bool) (*Imposter, error) {
+func (cli *Client) Delete(ctx context.Context, port int, replay bool) (*Imposter, error) {
 	p := fmt.Sprintf("/imposters/%d", port)
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.restCli.NewRequest(http.MethodDelete, p, nil, vs)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodDelete, p, nil, vs)
 	if err != nil {
 		return nil, err
 	}
@@ -164,10 +165,10 @@ func (cli *Client) Delete(port int, replay bool) (*Imposter, error) {
 //
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#delete-imposter-requests.
-func (cli *Client) DeleteRequests(port int) (*Imposter, error) {
+func (cli *Client) DeleteRequests(ctx context.Context, port int) (*Imposter, error) {
 	p := fmt.Sprintf("/imposters/%d/requests", port)
 
-	req, err := cli.restCli.NewRequest(http.MethodDelete, p, nil, nil)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodDelete, p, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +200,7 @@ type imposterListWrapper struct {
 //
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#put-imposters.
-func (cli *Client) Overwrite(imps []Imposter) ([]Imposter, error) {
+func (cli *Client) Overwrite(ctx context.Context, imps []Imposter) ([]Imposter, error) {
 	p := "/imposters"
 
 	b, err := json.Marshal(&struct {
@@ -211,7 +212,7 @@ func (cli *Client) Overwrite(imps []Imposter) ([]Imposter, error) {
 		return nil, err
 	}
 
-	req, err := cli.restCli.NewRequest(http.MethodPut, p, bytes.NewReader(b), nil)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodPut, p, bytes.NewReader(b), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -236,12 +237,12 @@ func (cli *Client) Overwrite(imps []Imposter) ([]Imposter, error) {
 //
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#get-imposters.
-func (cli *Client) Imposters(replay bool) ([]Imposter, error) {
+func (cli *Client) Imposters(ctx context.Context, replay bool) ([]Imposter, error) {
 	p := "/imposters"
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, vs)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodGet, p, nil, vs)
 	if err != nil {
 		return nil, err
 	}
@@ -268,12 +269,12 @@ func (cli *Client) Imposters(replay bool) ([]Imposter, error) {
 //
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#delete-imposters.
-func (cli *Client) DeleteAll(replay bool) ([]Imposter, error) {
+func (cli *Client) DeleteAll(ctx context.Context, replay bool) ([]Imposter, error) {
 	p := "/imposters"
 	vs := url.Values{}
 	vs.Add("replayable", strconv.FormatBool(replay))
 
-	req, err := cli.restCli.NewRequest(http.MethodDelete, p, nil, vs)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodDelete, p, nil, vs)
 	if err != nil {
 		return nil, err
 	}
@@ -335,10 +336,10 @@ type Config struct {
 //
 // See more information on this resource at:
 // http://www.mbtest.org/docs/api/overview#get-config.
-func (cli *Client) Config() (*Config, error) {
+func (cli *Client) Config(ctx context.Context) (*Config, error) {
 	p := "/config"
 
-	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, nil)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodGet, p, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +377,7 @@ type Log struct {
 //
 // See more information on this resource at:
 // http://www.mbtest.org/docs/api/overview#get-logs.
-func (cli *Client) Logs(start, end int) ([]Log, error) {
+func (cli *Client) Logs(ctx context.Context, start, end int) ([]Log, error) {
 	p := "/logs"
 	vs := url.Values{}
 	if start >= 0 {
@@ -386,7 +387,7 @@ func (cli *Client) Logs(start, end int) ([]Log, error) {
 		vs.Add("endIndex", strconv.Itoa(end))
 	}
 
-	req, err := cli.restCli.NewRequest(http.MethodGet, p, nil, vs)
+	req, err := cli.restCli.NewRequest(ctx, http.MethodGet, p, nil, vs)
 	if err != nil {
 		return nil, err
 	}
