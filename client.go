@@ -1,4 +1,3 @@
-// Package mbgo implements a mountebank API client.
 package mbgo
 
 import (
