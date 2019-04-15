@@ -29,18 +29,24 @@ func parseHybridAddress(s string) (ip net.IP, err error) {
 type HTTPRequest struct {
 	// RequestFrom is the originating address of the incoming request.
 	RequestFrom net.IP
+
 	// Method is the HTTP request method.
 	Method string
+
 	// Path is the path of the request, without the query parameters.
 	Path string
+
 	// Query contains the URL query parameters of the request.
 	// Note that more than one value per key is not supported.
 	Query map[string]string
+
 	// Headers contains the HTTP headers of the request.
 	// Note that more than one value per key is not supported.
 	Headers map[string]string
+
 	// Body is the body of the request.
 	Body interface{}
+
 	// Timestamp is the timestamp of the request.
 	Timestamp string
 }
@@ -80,6 +86,7 @@ func (r HTTPRequest) toDTO() httpRequestDTO {
 type TCPRequest struct {
 	// RequestFrom is the originating address of the incoming request.
 	RequestFrom net.IP
+
 	// Data is the data in the request as plaintext.
 	Data string
 }
@@ -168,12 +175,15 @@ type JSONPath struct {
 type Predicate struct {
 	// Operator is the conditional or logical operator of the Predicate.
 	Operator string
+
 	// Request is the request value challenged against the Operator;
 	// either of type HTTPRequest or TCPRequest.
 	Request interface{}
+
 	// JSONPath is the predicate parameter for narrowing the scope of JSON
 	// comparison; leave nil to disable functionality.
 	JSONPath *JSONPath
+
 	// CaseSensitive determines if the match is case sensitive or not.
 	CaseSensitive bool
 }
@@ -244,10 +254,13 @@ func (dto predicateDTO) unmarshalProto(proto string) (p Predicate, err error) {
 type HTTPResponse struct {
 	// StatusCode is the HTTP status code of the response.
 	StatusCode int
+
 	// Headers are the HTTP headers in the response.
 	Headers map[string]string
+
 	// Body is the body of the response. It will be JSON encoded before sending to mountebank
 	Body interface{}
+
 	// Mode is the mode of the response; either "text" or "binary".
 	// Defaults to "text" if excluded.
 	Mode string
@@ -309,18 +322,20 @@ func (r TCPResponse) toDTO() tcpResponseDTO {
 type Response struct {
 	// Type is the type of the Response; one of "is", "proxy" or "inject".
 	Type string
+
 	// Value is the value of the Response; either of type HTTPResponse or TCPResponse.
 	Value interface{}
+
 	// Behaviors is an optional field allowing the user to define response behavior.
 	Behaviors *Behaviors
 }
 
 // Behaviors defines the possible response behaviors for a stub.
-// Currently supported values are:
-// wait - Adds latency to a response by waiting a specified number of milliseconds before sending the response.
-// See more information on stub response behaviors in mountebank at:
+//
+// See more information on stub behaviours in mountebank at:
 // http://www.mbtest.org/docs/api/behaviors.
 type Behaviors struct {
+	// Wait adds latency to a response by waiting a specified number of milliseconds before sending the response.
 	Wait int `json:"wait,omitempty"`
 }
 
@@ -429,6 +444,7 @@ type Stub struct {
 	// Predicates are the list of Predicates associated with the Stub,
 	// which are logically AND'd together if more than one exists.
 	Predicates []Predicate
+
 	// Responses are the circular queue of Responses used to respond to
 	// incoming matched requests.
 	Responses []Response
@@ -507,27 +523,35 @@ func (dto stubDTO) unmarshalProto(proto string) (s Stub, err error) {
 type Imposter struct {
 	// Port is the listening port of the Imposter; required.
 	Port int
+
 	// Proto is the listening protocol of the Imposter; required.
 	Proto string
+
 	// Name is the name of the Imposter.
 	Name string
+
 	// RecordRequests adds mock verification support to the Imposter
 	// by having it remember any requests made to it, which can later
 	// be retrieved and examined by the testing environment.
 	RecordRequests bool
+
 	// Requests are the list of recorded requests, or nil if RecordRequests == false.
 	// Note that the underlying type will be HTTPRequest or TCPRequest depending on
 	// the protocol of the Imposter.
 	Requests []interface{}
+
 	// RequestCount is the number of matched requests received by the Imposter.
 	// Note that this value is only used/set when receiving Imposter data
 	// from the mountebank server.
 	RequestCount int
+
 	// AllowCORS will allow all CORS pre-flight requests on the Imposter.
 	AllowCORS bool
+
 	// DefaultResponse is the default response to send if no predicate matches.
 	// Only used by HTTP and TCP Imposters; should be one of HTTPResponse or TCPResponse.
 	DefaultResponse interface{}
+
 	// Stubs contains zero or more valid Stubs associated with the Imposter.
 	Stubs []Stub
 }

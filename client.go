@@ -303,6 +303,7 @@ func (cli *Client) DeleteAll(ctx context.Context, replay bool) ([]Imposter, erro
 type Config struct {
 	// Version represents the mountebank version in semantic M.m.p format.
 	Version string `json:"version"`
+
 	// Options represent runtime options of the mountebank server process.
 	Options struct {
 		Help           bool     `json:"help"`
@@ -318,6 +319,7 @@ type Config struct {
 		LogLevel       string   `json:"loglevel"`
 		IPWhitelist    []string `json:"ipWhitelist"`
 	} `json:"options"`
+
 	// Process represents information about the mountebank server NodeJS runtime.
 	Process struct {
 		NodeVersion  string  `json:"nodeVersion"`
