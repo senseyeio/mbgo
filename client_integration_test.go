@@ -89,11 +89,11 @@ func TestClient_Create(t *testing.T) {
 								Request: mbgo.HTTPRequest{
 									Method: http.MethodGet,
 									Path:   "/foo",
-									Query: map[string]string{
-										"page": "3",
+									Query: map[string][]string{
+										"page": {"3"},
 									},
-									Headers: map[string]string{
-										"Accept": "application/json",
+									Headers: map[string][]string{
+										"Accept": {"application/json"},
 									},
 								},
 							},
@@ -103,8 +103,8 @@ func TestClient_Create(t *testing.T) {
 								Type: "is",
 								Value: mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
-									Headers: map[string]string{
-										"Content-Type": "application/json",
+									Headers: map[string][]string{
+										"Content-Type": {"application/json"},
 									},
 									Body: `{"test":true}`,
 								},
@@ -137,11 +137,11 @@ func TestClient_Create(t *testing.T) {
 								Request: mbgo.HTTPRequest{
 									Method: http.MethodGet,
 									Path:   "/foo",
-									Query: map[string]string{
-										"page": "3",
+									Query: map[string][]string{
+										"page": {"3"},
 									},
-									Headers: map[string]string{
-										"Accept": "application/json",
+									Headers: map[string][]string{
+										"Accept": {"application/json"},
 									},
 								},
 							},
@@ -151,8 +151,8 @@ func TestClient_Create(t *testing.T) {
 								Type: "is",
 								Value: mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
-									Headers: map[string]string{
-										"Content-Type": "application/json",
+									Headers: map[string][]string{
+										"Content-Type": {"application/json"},
 									},
 									Body: `{"test":true}`,
 								},
@@ -498,11 +498,11 @@ func TestClient_Imposters(t *testing.T) {
 									Request: mbgo.HTTPRequest{
 										Method: http.MethodGet,
 										Path:   "/foo",
-										Query: map[string]string{
-											"page": "3",
+										Query: map[string][]string{
+											"page": {"3"},
 										},
-										Headers: map[string]string{
-											"Accept": "application/json",
+										Headers: map[string][]string{
+											"Accept": {"application/json"},
 										},
 									},
 								},
@@ -512,8 +512,8 @@ func TestClient_Imposters(t *testing.T) {
 									Type: "is",
 									Value: mbgo.HTTPResponse{
 										StatusCode: http.StatusOK,
-										Headers: map[string]string{
-											"Content-Type": "application/json",
+										Headers: map[string][]string{
+											"Content-Type": {"application/json"},
 										},
 										Body: `{"test":true}`,
 									},

@@ -38,11 +38,11 @@ type HTTPRequest struct {
 
 	// Query contains the URL query parameters of the request.
 	// Note that more than one value per key is not supported.
-	Query map[string]string
+	Query map[string][]string
 
 	// Headers contains the HTTP headers of the request.
 	// Note that more than one value per key is not supported.
-	Headers map[string]string
+	Headers map[string][]string
 
 	// Body is the body of the request.
 	Body interface{}
@@ -54,13 +54,30 @@ type HTTPRequest struct {
 // httpRequestDTO is a data transfer object used as an intermediary value
 // for marshalling and un-marshalling the JSON structure of an HTTPRequest.
 type httpRequestDTO struct {
-	RequestFrom string            `json:"requestFrom,omitempty"`
-	Method      string            `json:"method,omitempty"`
-	Path        string            `json:"path,omitempty"`
-	Query       map[string]string `json:"query,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Body        interface{}       `json:"body,omitempty"`
-	Timestamp   string            `json:"timestamp,omitempty"`
+	RequestFrom string                 `json:"requestFrom,omitempty"`
+	Method      string                 `json:"method,omitempty"`
+	Path        string                 `json:"path,omitempty"`
+	Query       map[string]interface{} `json:"query,omitempty"`
+	Headers     map[string]interface{} `json:"headers,omitempty"`
+	Body        interface{}            `json:"body,omitempty"`
+	Timestamp   string                 `json:"timestamp,omitempty"`
+}
+
+// toQuery maps an HTTP query or header value to its moutebank JSON representation.
+func toQuery(q map[string][]string) map[string]interface{} {
+	out := make(map[string]interface{}, len(q))
+
+	for k, ss := range q {
+		if len(ss) == 0 {
+			continue
+		} else if len(ss) == 1 {
+			out[k] = ss[0]
+		} else {
+			out[k] = ss
+		}
+	}
+
+	return out
 }
 
 // toDTO maps an HTTPRequest value to a httpRequestDTO value.
@@ -71,8 +88,8 @@ func (r HTTPRequest) toDTO() httpRequestDTO {
 	}
 	dto.Method = r.Method
 	dto.Path = r.Path
-	dto.Query = r.Query
-	dto.Headers = r.Headers
+	dto.Query = toQuery(r.Query)
+	dto.Headers = toQuery(r.Headers)
 	dto.Body = r.Body
 	dto.Timestamp = r.Timestamp
 	return dto
@@ -108,6 +125,33 @@ func (r TCPRequest) toDTO() tcpRequestDTO {
 	return dto
 }
 
+// parseQuery parses a mountebank JSON representation of an HTTP header or query
+// into its respective struct field value.
+func parseQuery(q map[string]interface{}) (map[string][]string, error) {
+	out := make(map[string][]string, len(q))
+
+	for k, v := range q {
+		switch typ := v.(type) {
+		case string:
+			out[k] = []string{typ}
+		case []interface{}:
+			ss := make([]string, len(typ))
+			for i, elem := range typ {
+				s, ok := elem.(string)
+				if !ok {
+					return nil, errors.New("invalid query key array subtype")
+				}
+				ss[i] = s
+			}
+			out[k] = ss
+		default:
+			return nil, errors.New("invalid query key type")
+		}
+	}
+
+	return out, nil
+}
+
 // unmarshalRequest unmarshals a network request given its protocol proto and the JSON data b.
 func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error) {
 	switch proto {
@@ -116,19 +160,33 @@ func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error
 		if err = json.Unmarshal(b, &dto); err != nil {
 			return
 		}
-		var ip net.IP
+
+		var (
+			ip   net.IP
+			q, h map[string][]string
+		)
+
 		if dto.RequestFrom != "" {
 			ip, err = parseHybridAddress(dto.RequestFrom)
 			if err != nil {
 				return
 			}
 		}
+		q, err = parseQuery(dto.Query)
+		if err != nil {
+			return
+		}
+		h, err = parseQuery(dto.Headers)
+		if err != nil {
+			return
+		}
+
 		v = HTTPRequest{
 			RequestFrom: ip,
 			Method:      dto.Method,
 			Path:        dto.Path,
-			Query:       dto.Query,
-			Headers:     dto.Headers,
+			Query:       q,
+			Headers:     h,
 			Body:        dto.Body,
 			Timestamp:   dto.Timestamp,
 		}
@@ -256,7 +314,7 @@ type HTTPResponse struct {
 	StatusCode int
 
 	// Headers are the HTTP headers in the response.
-	Headers map[string]string
+	Headers map[string][]string
 
 	// Body is the body of the response. It will be JSON encoded before sending to mountebank
 	Body interface{}
@@ -269,17 +327,17 @@ type HTTPResponse struct {
 // httpResponseDTO is the data-transfer object used to describe the
 // JSON structure of an HTTPResponse value.
 type httpResponseDTO struct {
-	StatusCode int               `json:"statusCode,omitempty"`
-	Headers    map[string]string `json:"headers,omitempty"`
-	Body       interface{}       `json:"body,omitempty"`
-	Mode       string            `json:"_mode,omitempty"`
+	StatusCode int                    `json:"statusCode,omitempty"`
+	Headers    map[string]interface{} `json:"headers,omitempty"`
+	Body       interface{}            `json:"body,omitempty"`
+	Mode       string                 `json:"_mode,omitempty"`
 }
 
 // toDTO maps a HTTPResponse value to an httpResponseDTO value.
 func (r HTTPResponse) toDTO() httpResponseDTO {
 	return httpResponseDTO{
 		StatusCode: r.StatusCode,
-		Headers:    r.Headers,
+		Headers:    toQuery(r.Headers),
 		Body:       r.Body,
 		Mode:       r.Mode,
 	}
@@ -410,9 +468,13 @@ func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 			if err = json.Unmarshal(b, &r); err != nil {
 				return
 			}
+			var h map[string][]string
+			h, err = parseQuery(r.Headers)
+			if err != nil {
+			}
 			resp.Value = HTTPResponse{
 				StatusCode: r.StatusCode,
-				Headers:    r.Headers,
+				Headers:    h,
 				Body:       r.Body,
 				Mode:       r.Mode,
 			}

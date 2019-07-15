@@ -91,11 +91,11 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									RequestFrom: net.IPv4(172, 17, 0, 1),
 									Method:      http.MethodGet,
 									Path:        "/foo",
-									Query: map[string]string{
-										"page": "3",
+									Query: map[string][]string{
+										"page": {"3"},
 									},
-									Headers: map[string]string{
-										"Accept": "application/json",
+									Headers: map[string][]string{
+										"Accept": {"application/json"},
 									},
 									Timestamp: "2018-10-10T09:12:08.075Z",
 								},
@@ -106,8 +106,8 @@ func TestImposter_MarshalJSON(t *testing.T) {
 								Type: "is",
 								Value: mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
-									Headers: map[string]string{
-										"Content-Type": "application/json",
+									Headers: map[string][]string{
+										"Content-Type": {"application/json"},
 									},
 									Body: `{"test":true}`,
 								},
@@ -178,8 +178,8 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									RequestFrom: net.IPv4(172, 17, 0, 1),
 									Method:      http.MethodGet,
 									Path:        "/foo",
-									Headers: map[string]string{
-										"Accept": "application/json",
+									Headers: map[string][]string{
+										"Accept": {"application/json"},
 									},
 								},
 							},
@@ -189,8 +189,8 @@ func TestImposter_MarshalJSON(t *testing.T) {
 								Type: "is",
 								Value: mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
-									Headers: map[string]string{
-										"Content-Type": "application/json",
+									Headers: map[string][]string{
+										"Content-Type": {"application/json"},
 									},
 									Body: struct {
 										Test bool `json:"test"`
@@ -268,8 +268,8 @@ func TestImposter_MarshalJSON(t *testing.T) {
 								Type: "is",
 								Value: mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
-									Headers: map[string]string{
-										"Content-Type": "application/json",
+									Headers: map[string][]string{
+										"Content-Type": {"application/json"},
 									},
 									Body: `{"test":true}`,
 								},
@@ -437,11 +437,11 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 									RequestFrom: net.IPv4(172, 17, 0, 1),
 									Method:      "POST",
 									Path:        "/foo",
-									Query: map[string]string{
-										"bar": "baz",
+									Query: map[string][]string{
+										"bar": {"baz"},
 									},
-									Headers: map[string]string{
-										"Content-Type": "application/json",
+									Headers: map[string][]string{
+										"Content-Type": {"application/json"},
 									},
 									Body: `{"predicate":true}`,
 								},
@@ -453,9 +453,9 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 								Value: mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
 									Mode:       "text",
-									Headers: map[string]string{
-										"Accept":       "application/json",
-										"Content-Type": "application/json",
+									Headers: map[string][]string{
+										"Accept":       {"application/json"},
+										"Content-Type": {"application/json"},
 									},
 									Body: `{"response":true}`,
 								},
