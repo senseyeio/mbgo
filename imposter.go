@@ -37,11 +37,9 @@ type HTTPRequest struct {
 	Path string
 
 	// Query contains the URL query parameters of the request.
-	// Note that more than one value per key is not supported.
 	Query map[string][]string
 
 	// Headers contains the HTTP headers of the request.
-	// Note that more than one value per key is not supported.
 	Headers map[string][]string
 
 	// Body is the body of the request.
