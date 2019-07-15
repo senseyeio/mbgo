@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -37,10 +39,10 @@ type HTTPRequest struct {
 	Path string
 
 	// Query contains the URL query parameters of the request.
-	Query map[string][]string
+	Query url.Values
 
 	// Headers contains the HTTP headers of the request.
-	Headers map[string][]string
+	Headers http.Header
 
 	// Body is the body of the request.
 	Body interface{}
@@ -61,8 +63,8 @@ type httpRequestDTO struct {
 	Timestamp   string                 `json:"timestamp,omitempty"`
 }
 
-// toQuery maps an HTTP query or header value to its moutebank JSON representation.
-func toQuery(q map[string][]string) map[string]interface{} {
+// toMapValues maps an HTTP query or header value to its moutebank JSON representation.
+func toMapValues(q map[string][]string) map[string]interface{} {
 	out := make(map[string]interface{}, len(q))
 
 	for k, ss := range q {
@@ -86,8 +88,8 @@ func (r HTTPRequest) toDTO() httpRequestDTO {
 	}
 	dto.Method = r.Method
 	dto.Path = r.Path
-	dto.Query = toQuery(r.Query)
-	dto.Headers = toQuery(r.Headers)
+	dto.Query = toMapValues(r.Query)
+	dto.Headers = toMapValues(r.Headers)
 	dto.Body = r.Body
 	dto.Timestamp = r.Timestamp
 	return dto
@@ -123,9 +125,9 @@ func (r TCPRequest) toDTO() tcpRequestDTO {
 	return dto
 }
 
-// parseQuery parses a mountebank JSON representation of an HTTP header or query
-// into its respective struct field value.
-func parseQuery(q map[string]interface{}) (map[string][]string, error) {
+// fromMapValues parses a mountebank JSON representation of an HTTP header or query
+// into its respective stdlib map representation.
+func fromMapValues(q map[string]interface{}) (map[string][]string, error) {
 	out := make(map[string][]string, len(q))
 
 	for k, v := range q {
@@ -170,11 +172,11 @@ func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error
 				return
 			}
 		}
-		q, err = parseQuery(dto.Query)
+		q, err = fromMapValues(dto.Query)
 		if err != nil {
 			return
 		}
-		h, err = parseQuery(dto.Headers)
+		h, err = fromMapValues(dto.Headers)
 		if err != nil {
 			return
 		}
@@ -312,7 +314,7 @@ type HTTPResponse struct {
 	StatusCode int
 
 	// Headers are the HTTP headers in the response.
-	Headers map[string][]string
+	Headers http.Header
 
 	// Body is the body of the response. It will be JSON encoded before sending to mountebank
 	Body interface{}
@@ -335,7 +337,7 @@ type httpResponseDTO struct {
 func (r HTTPResponse) toDTO() httpResponseDTO {
 	return httpResponseDTO{
 		StatusCode: r.StatusCode,
-		Headers:    toQuery(r.Headers),
+		Headers:    toMapValues(r.Headers),
 		Body:       r.Body,
 		Mode:       r.Mode,
 	}
@@ -467,7 +469,7 @@ func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 				return
 			}
 			var h map[string][]string
-			h, err = parseQuery(r.Headers)
+			h, err = fromMapValues(r.Headers)
 			if err != nil {
 			}
 			resp.Value = HTTPResponse{
