@@ -145,7 +145,7 @@ func fromMapValues(q map[string]interface{}) (map[string][]string, error) {
 			}
 			out[k] = ss
 		default:
-			return nil, errors.New("invalid query key type")
+			return nil, fmt.Errorf("invalid query key type: %#v", typ)
 		}
 	}
 
