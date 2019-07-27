@@ -69,7 +69,7 @@ func TestClient_NewRequest(t *testing.T) {
 					ProtoMinor: 1,
 					Header:     http.Header{"Accept": []string{"application/json"}},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.TODO()))
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
@@ -86,7 +86,7 @@ func TestClient_NewRequest(t *testing.T) {
 					ProtoMinor: 1,
 					Header:     http.Header{"Accept": []string{"application/json"}},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.TODO()))
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
@@ -103,7 +103,7 @@ func TestClient_NewRequest(t *testing.T) {
 					ProtoMinor: 1,
 					Header:     http.Header{"Accept": []string{"application/json"}},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.TODO()))
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
@@ -123,7 +123,7 @@ func TestClient_NewRequest(t *testing.T) {
 						"Content-Type": []string{"application/json"},
 					},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.TODO()))
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
@@ -143,7 +143,7 @@ func TestClient_NewRequest(t *testing.T) {
 						"Content-Type": []string{"application/json"},
 					},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.TODO()))
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 	}
@@ -155,7 +155,7 @@ func TestClient_NewRequest(t *testing.T) {
 			t.Parallel()
 
 			cli := rest.NewClient(nil, c.Root)
-			req, err := cli.NewRequest(context.TODO(), c.Method, c.Path, c.Body, c.Query)
+			req, err := cli.NewRequest(context.Background(), c.Method, c.Path, c.Body, c.Query)
 			c.AssertFunc(t, req, err)
 		})
 	}
