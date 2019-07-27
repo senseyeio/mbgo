@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -32,18 +34,22 @@ func parseHybridAddress(s string) (ip net.IP, err error) {
 type HTTPRequest struct {
 	// RequestFrom is the originating address of the incoming request.
 	RequestFrom net.IP
+
 	// Method is the HTTP request method.
 	Method string
+
 	// Path is the path of the request, without the query parameters.
 	Path string
+
 	// Query contains the URL query parameters of the request.
-	// Note that more than one value per key is not supported.
-	Query map[string]string
+	Query url.Values
+
 	// Headers contains the HTTP headers of the request.
-	// Note that more than one value per key is not supported.
-	Headers map[string]string
+	Headers http.Header
+
 	// Body is the body of the request.
 	Body interface{}
+
 	// Timestamp is the timestamp of the request.
 	Timestamp string
 }
@@ -51,13 +57,30 @@ type HTTPRequest struct {
 // httpRequestDTO is a data transfer object used as an intermediary value
 // for marshalling and un-marshalling the JSON structure of an HTTPRequest.
 type httpRequestDTO struct {
-	RequestFrom string            `json:"requestFrom,omitempty"`
-	Method      string            `json:"method,omitempty"`
-	Path        string            `json:"path,omitempty"`
-	Query       map[string]string `json:"query,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Body        interface{}       `json:"body,omitempty"`
-	Timestamp   string            `json:"timestamp,omitempty"`
+	RequestFrom string                 `json:"requestFrom,omitempty"`
+	Method      string                 `json:"method,omitempty"`
+	Path        string                 `json:"path,omitempty"`
+	Query       map[string]interface{} `json:"query,omitempty"`
+	Headers     map[string]interface{} `json:"headers,omitempty"`
+	Body        interface{}            `json:"body,omitempty"`
+	Timestamp   string                 `json:"timestamp,omitempty"`
+}
+
+// toMapValues maps an HTTP query or header value to its mountebank JSON representation.
+func toMapValues(q map[string][]string) map[string]interface{} {
+	out := make(map[string]interface{}, len(q))
+
+	for k, ss := range q {
+		if len(ss) == 0 {
+			continue
+		} else if len(ss) == 1 {
+			out[k] = ss[0]
+		} else {
+			out[k] = ss
+		}
+	}
+
+	return out
 }
 
 // toDTO maps an HTTPRequest value to a httpRequestDTO value.
@@ -68,8 +91,8 @@ func (r HTTPRequest) toDTO() httpRequestDTO {
 	}
 	dto.Method = r.Method
 	dto.Path = r.Path
-	dto.Query = r.Query
-	dto.Headers = r.Headers
+	dto.Query = toMapValues(r.Query)
+	dto.Headers = toMapValues(r.Headers)
 	dto.Body = r.Body
 	dto.Timestamp = r.Timestamp
 	return dto
@@ -83,6 +106,7 @@ func (r HTTPRequest) toDTO() httpRequestDTO {
 type TCPRequest struct {
 	// RequestFrom is the originating address of the incoming request.
 	RequestFrom net.IP
+
 	// Data is the data in the request as plaintext.
 	Data string
 }
@@ -104,6 +128,33 @@ func (r TCPRequest) toDTO() tcpRequestDTO {
 	return dto
 }
 
+// fromMapValues parses a mountebank JSON representation of an HTTP header or query
+// into its respective stdlib map representation.
+func fromMapValues(q map[string]interface{}) (map[string][]string, error) {
+	out := make(map[string][]string, len(q))
+
+	for k, v := range q {
+		switch typ := v.(type) {
+		case string:
+			out[k] = []string{typ}
+		case []interface{}:
+			ss := make([]string, len(typ))
+			for i, elem := range typ {
+				s, ok := elem.(string)
+				if !ok {
+					return nil, errors.New("invalid query key array subtype")
+				}
+				ss[i] = s
+			}
+			out[k] = ss
+		default:
+			return nil, fmt.Errorf("invalid query key type: %#v", typ)
+		}
+	}
+
+	return out, nil
+}
+
 // unmarshalRequest unmarshals a network request given its protocol proto and the JSON data b.
 func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error) {
 	switch proto {
@@ -112,19 +163,33 @@ func unmarshalRequest(proto string, b json.RawMessage) (v interface{}, err error
 		if err = json.Unmarshal(b, &dto); err != nil {
 			return
 		}
-		var ip net.IP
+
+		var (
+			ip   net.IP
+			q, h map[string][]string
+		)
+
 		if dto.RequestFrom != "" {
 			ip, err = parseHybridAddress(dto.RequestFrom)
 			if err != nil {
 				return
 			}
 		}
+		q, err = fromMapValues(dto.Query)
+		if err != nil {
+			return
+		}
+		h, err = fromMapValues(dto.Headers)
+		if err != nil {
+			return
+		}
+
 		v = HTTPRequest{
 			RequestFrom: ip,
 			Method:      dto.Method,
 			Path:        dto.Path,
-			Query:       dto.Query,
-			Headers:     dto.Headers,
+			Query:       q,
+			Headers:     h,
 			Body:        dto.Body,
 			Timestamp:   dto.Timestamp,
 		}
@@ -171,12 +236,15 @@ type JSONPath struct {
 type Predicate struct {
 	// Operator is the conditional or logical operator of the Predicate.
 	Operator string
+
 	// Request is the request value challenged against the Operator;
 	// either of type HTTPRequest or TCPRequest.
 	Request interface{}
+
 	// JSONPath is the predicate parameter for narrowing the scope of JSON
 	// comparison; leave nil to disable functionality.
 	JSONPath *JSONPath
+
 	// CaseSensitive determines if the match is case sensitive or not.
 	CaseSensitive bool
 }
@@ -247,10 +315,13 @@ func (dto predicateDTO) unmarshalProto(proto string) (p Predicate, err error) {
 type HTTPResponse struct {
 	// StatusCode is the HTTP status code of the response.
 	StatusCode int
+
 	// Headers are the HTTP headers in the response.
-	Headers map[string]string
+	Headers http.Header
+
 	// Body is the body of the response. It will be JSON encoded before sending to mountebank
 	Body interface{}
+
 	// Mode is the mode of the response; either "text" or "binary".
 	// Defaults to "text" if excluded.
 	Mode string
@@ -259,17 +330,17 @@ type HTTPResponse struct {
 // httpResponseDTO is the data-transfer object used to describe the
 // JSON structure of an HTTPResponse value.
 type httpResponseDTO struct {
-	StatusCode int               `json:"statusCode,omitempty"`
-	Headers    map[string]string `json:"headers,omitempty"`
-	Body       interface{}       `json:"body,omitempty"`
-	Mode       string            `json:"_mode,omitempty"`
+	StatusCode int                    `json:"statusCode,omitempty"`
+	Headers    map[string]interface{} `json:"headers,omitempty"`
+	Body       interface{}            `json:"body,omitempty"`
+	Mode       string                 `json:"_mode,omitempty"`
 }
 
 // toDTO maps a HTTPResponse value to an httpResponseDTO value.
 func (r HTTPResponse) toDTO() httpResponseDTO {
 	return httpResponseDTO{
 		StatusCode: r.StatusCode,
-		Headers:    r.Headers,
+		Headers:    toMapValues(r.Headers),
 		Body:       r.Body,
 		Mode:       r.Mode,
 	}
@@ -312,18 +383,20 @@ func (r TCPResponse) toDTO() tcpResponseDTO {
 type Response struct {
 	// Type is the type of the Response; one of "is", "proxy" or "inject".
 	Type string
+
 	// Value is the value of the Response; either of type HTTPResponse or TCPResponse.
 	Value interface{}
+
 	// Behaviors is an optional field allowing the user to define response behavior.
 	Behaviors *Behaviors
 }
 
 // Behaviors defines the possible response behaviors for a stub.
-// Currently supported values are:
-// wait - Adds latency to a response by waiting a specified number of milliseconds before sending the response.
-// See more information on stub response behaviors in mountebank at:
+//
+// See more information on stub behaviours in mountebank at:
 // http://www.mbtest.org/docs/api/behaviors.
 type Behaviors struct {
+	// Wait adds latency to a response by waiting a specified number of milliseconds before sending the response.
 	Wait int `json:"wait,omitempty"`
 }
 
@@ -398,9 +471,13 @@ func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 			if err = json.Unmarshal(b, &r); err != nil {
 				return
 			}
+			var h map[string][]string
+			h, err = fromMapValues(r.Headers)
+			if err != nil {
+			}
 			resp.Value = HTTPResponse{
 				StatusCode: r.StatusCode,
-				Headers:    r.Headers,
+				Headers:    h,
 				Body:       r.Body,
 				Mode:       r.Mode,
 			}
@@ -432,6 +509,7 @@ type Stub struct {
 	// Predicates are the list of Predicates associated with the Stub,
 	// which are logically AND'd together if more than one exists.
 	Predicates []Predicate
+
 	// Responses are the circular queue of Responses used to respond to
 	// incoming matched requests.
 	Responses []Response
@@ -510,27 +588,35 @@ func (dto stubDTO) unmarshalProto(proto string) (s Stub, err error) {
 type Imposter struct {
 	// Port is the listening port of the Imposter; required.
 	Port int
+
 	// Proto is the listening protocol of the Imposter; required.
 	Proto string
+
 	// Name is the name of the Imposter.
 	Name string
+
 	// RecordRequests adds mock verification support to the Imposter
 	// by having it remember any requests made to it, which can later
 	// be retrieved and examined by the testing environment.
 	RecordRequests bool
+
 	// Requests are the list of recorded requests, or nil if RecordRequests == false.
 	// Note that the underlying type will be HTTPRequest or TCPRequest depending on
 	// the protocol of the Imposter.
 	Requests []interface{}
+
 	// RequestCount is the number of matched requests received by the Imposter.
 	// Note that this value is only used/set when receiving Imposter data
 	// from the mountebank server.
 	RequestCount int
+
 	// AllowCORS will allow all CORS pre-flight requests on the Imposter.
 	AllowCORS bool
+
 	// DefaultResponse is the default response to send if no predicate matches.
 	// Only used by HTTP and TCP Imposters; should be one of HTTPResponse or TCPResponse.
 	DefaultResponse interface{}
+
 	// Stubs contains zero or more valid Stubs associated with the Imposter.
 	Stubs []Stub
 }

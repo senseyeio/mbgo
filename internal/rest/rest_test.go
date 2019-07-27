@@ -4,6 +4,7 @@
 package rest_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -32,14 +33,17 @@ func TestClient_NewRequest(t *testing.T) {
 		Query  url.Values
 
 		// output expectations
-		Request *http.Request
-		Err     error
+		AssertFunc func(*testing.T, *http.Request, error)
+		Request    *http.Request
+		Err        error
 	}{
 		{
 			Description: "should return an error if the provided request method is invalid",
 			Root:        &url.URL{},
 			Method:      "bad method",
-			Err:         errors.New(`net/http: invalid method "bad method"`),
+			AssertFunc: func(t *testing.T, _ *http.Request, err error) {
+				assert.Equals(t, err, errors.New(`net/http: invalid method "bad method"`))
+			},
 		},
 		{
 			Description: "should construct the URL based on provided root URL, path and query parameters",
@@ -52,77 +56,97 @@ func TestClient_NewRequest(t *testing.T) {
 			Query: url.Values{
 				"replayable": []string{"true"},
 			},
-			Request: &http.Request{
-				Method: http.MethodGet,
-				URL: &url.URL{
-					Scheme:   "http",
-					Host:     net.JoinHostPort("localhost", "2525"),
-					Path:     "/foo",
-					RawQuery: "replayable=true",
-				},
-				Host:       net.JoinHostPort("localhost", "2525"),
-				Proto:      "HTTP/1.1",
-				ProtoMajor: 1,
-				ProtoMinor: 1,
-				Header:     http.Header{"Accept": []string{"application/json"}},
+			AssertFunc: func(t *testing.T, actual *http.Request, err error) {
+				assert.Ok(t, err)
+				expected := &http.Request{
+					Method: http.MethodGet,
+					URL: &url.URL{
+						Scheme:   "http",
+						Host:     net.JoinHostPort("localhost", "2525"),
+						Path:     "/foo",
+						RawQuery: "replayable=true",
+					},
+					Host:       net.JoinHostPort("localhost", "2525"),
+					Proto:      "HTTP/1.1",
+					ProtoMajor: 1,
+					ProtoMinor: 1,
+					Header:     http.Header{"Accept": []string{"application/json"}},
+				}
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
 			Description: "should only set the 'Accept' header if method is GET",
 			Root:        &url.URL{},
 			Method:      http.MethodGet,
-			Request: &http.Request{
-				Method:     http.MethodGet,
-				URL:        &url.URL{},
-				Proto:      "HTTP/1.1",
-				ProtoMajor: 1,
-				ProtoMinor: 1,
-				Header:     http.Header{"Accept": []string{"application/json"}},
+			AssertFunc: func(t *testing.T, actual *http.Request, err error) {
+				assert.Ok(t, err)
+				expected := &http.Request{
+					Method:     http.MethodGet,
+					URL:        &url.URL{},
+					Proto:      "HTTP/1.1",
+					ProtoMajor: 1,
+					ProtoMinor: 1,
+					Header:     http.Header{"Accept": []string{"application/json"}},
+				}
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
 			Description: "should only set the 'Accept' header if method is DELETE",
 			Root:        &url.URL{},
 			Method:      http.MethodDelete,
-			Request: &http.Request{
-				Method:     http.MethodDelete,
-				URL:        &url.URL{},
-				Proto:      "HTTP/1.1",
-				ProtoMajor: 1,
-				ProtoMinor: 1,
-				Header:     http.Header{"Accept": []string{"application/json"}},
+			AssertFunc: func(t *testing.T, actual *http.Request, err error) {
+				assert.Ok(t, err)
+				expected := &http.Request{
+					Method:     http.MethodDelete,
+					URL:        &url.URL{},
+					Proto:      "HTTP/1.1",
+					ProtoMajor: 1,
+					ProtoMinor: 1,
+					Header:     http.Header{"Accept": []string{"application/json"}},
+				}
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
 			Description: "should set both the 'Accept' and 'Content-Type' headers if method is POST",
 			Root:        &url.URL{},
 			Method:      http.MethodPost,
-			Request: &http.Request{
-				Method:     http.MethodPost,
-				URL:        &url.URL{},
-				Proto:      "HTTP/1.1",
-				ProtoMajor: 1,
-				ProtoMinor: 1,
-				Header: http.Header{
-					"Accept":       []string{"application/json"},
-					"Content-Type": []string{"application/json"},
-				},
+			AssertFunc: func(t *testing.T, actual *http.Request, err error) {
+				assert.Ok(t, err)
+				expected := &http.Request{
+					Method:     http.MethodPost,
+					URL:        &url.URL{},
+					Proto:      "HTTP/1.1",
+					ProtoMajor: 1,
+					ProtoMinor: 1,
+					Header: http.Header{
+						"Accept":       []string{"application/json"},
+						"Content-Type": []string{"application/json"},
+					},
+				}
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 		{
 			Description: "should set both the 'Accept' and 'Content-Type' headers if method is PUT",
 			Root:        &url.URL{},
 			Method:      http.MethodPut,
-			Request: &http.Request{
-				Method:     http.MethodPut,
-				URL:        &url.URL{},
-				Proto:      "HTTP/1.1",
-				ProtoMajor: 1,
-				ProtoMinor: 1,
-				Header: http.Header{
-					"Accept":       []string{"application/json"},
-					"Content-Type": []string{"application/json"},
-				},
+			AssertFunc: func(t *testing.T, actual *http.Request, err error) {
+				assert.Ok(t, err)
+				expected := &http.Request{
+					Method:     http.MethodPut,
+					URL:        &url.URL{},
+					Proto:      "HTTP/1.1",
+					ProtoMajor: 1,
+					ProtoMinor: 1,
+					Header: http.Header{
+						"Accept":       []string{"application/json"},
+						"Content-Type": []string{"application/json"},
+					},
+				}
+				assert.Equals(t, actual, expected.WithContext(context.Background()))
 			},
 		},
 	}
@@ -134,9 +158,8 @@ func TestClient_NewRequest(t *testing.T) {
 			t.Parallel()
 
 			cli := rest.NewClient(nil, c.Root)
-			req, err := cli.NewRequest(c.Method, c.Path, c.Body, c.Query)
-			assert.Equals(t, err, c.Err)
-			assert.Equals(t, req, c.Request)
+			req, err := cli.NewRequest(context.Background(), c.Method, c.Path, c.Body, c.Query)
+			c.AssertFunc(t, req, err)
 		})
 	}
 }

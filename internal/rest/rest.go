@@ -4,6 +4,7 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -30,7 +31,7 @@ func NewClient(cli *http.Client, root *url.URL) *Client {
 // provided request method, path, body and optional body/query
 // parameters, with the appropriate headers set depending on
 // the particular request method.
-func (cli *Client) NewRequest(method, path string, body io.Reader, q url.Values) (*http.Request, error) {
+func (cli *Client) NewRequest(ctx context.Context, method, path string, body io.Reader, q url.Values) (*http.Request, error) {
 	u := cli.baseURL.ResolveReference(&url.URL{Path: path})
 	u.RawQuery = q.Encode()
 
@@ -45,7 +46,7 @@ func (cli *Client) NewRequest(method, path string, body io.Reader, q url.Values)
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	return req, nil
+	return req.WithContext(ctx), nil
 }
 
 // Do sends an HTTP request and returns an HTTP response.
