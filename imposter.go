@@ -63,7 +63,7 @@ type httpRequestDTO struct {
 	Timestamp   string                 `json:"timestamp,omitempty"`
 }
 
-// toMapValues maps an HTTP query or header value to its moutebank JSON representation.
+// toMapValues maps an HTTP query or header value to its mountebank JSON representation.
 func toMapValues(q map[string][]string) map[string]interface{} {
 	out := make(map[string]interface{}, len(q))
 
