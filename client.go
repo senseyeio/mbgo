@@ -169,7 +169,7 @@ func (cli *Client) Delete(ctx context.Context, port int, replay bool) (*Imposter
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#delete-imposter-requests.
 func (cli *Client) DeleteRequests(ctx context.Context, port int) (*Imposter, error) {
-	p := fmt.Sprintf("/imposters/%d/requests", port)
+	p := fmt.Sprintf("/imposters/%d/savedProxyResponses", port)
 
 	req, err := cli.restCli.NewRequest(ctx, http.MethodDelete, p, nil, nil)
 	if err != nil {
