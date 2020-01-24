@@ -40,7 +40,7 @@ func TestClient_Logs(t *testing.T) {
 	vs, err := mb.Logs(newContext(time.Second), -1, -1)
 	assert.Equals(t, err, nil)
 	assert.Equals(t, len(vs) >= 2, true)
-	assert.Equals(t, vs[0].Message, "[mb:2525] mountebank v2.0.0 now taking orders - point your browser to http://localhost:2525/ for help")
+	assert.Equals(t, vs[0].Message, "[mb:2525] mountebank v2.1.2 now taking orders - point your browser to http://localhost:2525/ for help")
 	assert.Equals(t, vs[1].Message, "[mb:2525] GET /logs")
 }
 
@@ -299,6 +299,528 @@ func TestClient_Imposter(t *testing.T) {
 	}
 }
 
+func TestClient_AddStub(t *testing.T) {
+	mb := newMountebankClient()
+
+	cases := map[string]struct {
+		Before func(*testing.T, *mbgo.Client)
+		After  func(*testing.T, *mbgo.Client)
+		Port   int
+		Index  int
+		Stub   mbgo.Stub
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
+	}{
+		"should error if an imposter does not exist on the specified port": {
+			Port: 8080,
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Err: errors.New("no such resource: Try POSTing to /imposters first?"),
+		},
+		"should update the stubs on the imposter if it exists on the specified port": {
+			Port:  8080,
+			Index: 0,
+			Stub: mbgo.Stub{
+				Predicates: []mbgo.Predicate{
+					{
+						Operator: "endsWith",
+						Request: mbgo.TCPRequest{
+							Data: "foo",
+						},
+					},
+				},
+				Responses: []mbgo.Response{
+					{
+						Type: "is",
+						Value: mbgo.TCPResponse{
+							Data: "bar",
+						},
+					},
+				},
+			},
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Create(newContext(time.Second), mbgo.Imposter{
+					Port:  8080,
+					Proto: "tcp",
+					Name:  "add_stub_test",
+					Stubs: []mbgo.Stub{
+						{
+							Predicates: []mbgo.Predicate{
+								{
+									Operator: "endsWith",
+									Request: mbgo.TCPRequest{
+										Data: "SGVsbG8sIHdvcmxkIQ==",
+									},
+								},
+							},
+							Responses: []mbgo.Response{
+								{
+									Type: "is",
+									Value: mbgo.TCPResponse{
+										Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+									},
+								},
+							},
+						},
+					},
+				})
+				assert.Equals(t, err, nil)
+			},
+			After: func(t *testing.T, client *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Expected: &mbgo.Imposter{
+				Port:  8080,
+				Proto: "tcp",
+				Name:  "add_stub_test",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "endsWith",
+								Request: mbgo.TCPRequest{
+									Data: "foo",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "bar",
+								},
+							},
+						},
+					},
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "endsWith",
+								Request: mbgo.TCPRequest{
+									Data: "SGVsbG8sIHdvcmxkIQ==",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, c := range cases {
+		c := c
+
+		t.Run(name, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(t, mb)
+			}
+
+			actual, err := mb.AddStub(newContext(time.Second), c.Port, c.Index, c.Stub)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(t, mb)
+			}
+		})
+	}
+}
+
+func TestClient_OverwriteStub(t *testing.T) {
+	mb := newMountebankClient()
+
+	cases := map[string]struct {
+		Before func(*testing.T, *mbgo.Client)
+		After  func(*testing.T, *mbgo.Client)
+		Port   int
+		Index  int
+		Stub   mbgo.Stub
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
+	}{
+		"should error if an imposter does not exist on the specified port": {
+			Port: 8080,
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Err: errors.New("no such resource: Try POSTing to /imposters first?"),
+		},
+		"should overwrite the stub on the imposter if it exists on the specified port": {
+			Port:  8080,
+			Index: 0,
+			Stub: mbgo.Stub{
+				Predicates: []mbgo.Predicate{
+					{
+						Operator: "endsWith",
+						Request: mbgo.TCPRequest{
+							Data: "foo",
+						},
+					},
+				},
+				Responses: []mbgo.Response{
+					{
+						Type: "is",
+						Value: mbgo.TCPResponse{
+							Data: "bar",
+						},
+					},
+				},
+			},
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Create(newContext(time.Second), mbgo.Imposter{
+					Port:  8080,
+					Proto: "tcp",
+					Name:  "overwrite_stub_test",
+					Stubs: []mbgo.Stub{
+						{
+							Predicates: []mbgo.Predicate{
+								{
+									Operator: "endsWith",
+									Request: mbgo.TCPRequest{
+										Data: "SGVsbG8sIHdvcmxkIQ==",
+									},
+								},
+							},
+							Responses: []mbgo.Response{
+								{
+									Type: "is",
+									Value: mbgo.TCPResponse{
+										Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+									},
+								},
+							},
+						},
+					},
+				})
+				assert.Equals(t, err, nil)
+			},
+			After: func(t *testing.T, client *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Expected: &mbgo.Imposter{
+				Port:  8080,
+				Proto: "tcp",
+				Name:  "overwrite_stub_test",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "endsWith",
+								Request: mbgo.TCPRequest{
+									Data: "foo",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, c := range cases {
+		c := c
+
+		t.Run(name, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(t, mb)
+			}
+
+			actual, err := mb.OverwriteStub(newContext(time.Second), c.Port, c.Index, c.Stub)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(t, mb)
+			}
+		})
+	}
+}
+
+func TestClient_OverwriteAllStubs(t *testing.T) {
+	mb := newMountebankClient()
+
+	cases := map[string]struct {
+		Before func(*testing.T, *mbgo.Client)
+		After  func(*testing.T, *mbgo.Client)
+		Port   int
+		Stubs  []mbgo.Stub
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
+	}{
+		"should error if an imposter does not exist on the specified port": {
+			Port: 8080,
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Err: errors.New("no such resource: Try POSTing to /imposters first?"),
+		},
+		"should overwrite all stubs if the imposter exists": {
+			Port: 8080,
+			Stubs: []mbgo.Stub{
+				{
+					Predicates: []mbgo.Predicate{
+						{
+							Operator: "endsWith",
+							Request: mbgo.TCPRequest{
+								Data: "foo",
+							},
+						},
+					},
+					Responses: []mbgo.Response{
+						{
+							Type: "is",
+							Value: mbgo.TCPResponse{
+								Data: "bar",
+							},
+						},
+					},
+				},
+				{
+					Predicates: []mbgo.Predicate{
+						{
+							Operator: "endsWith",
+							Request: mbgo.TCPRequest{
+								Data: "bar",
+							},
+						},
+					},
+					Responses: []mbgo.Response{
+						{
+							Type: "is",
+							Value: mbgo.TCPResponse{
+								Data: "baz",
+							},
+						},
+					},
+				},
+			},
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Create(newContext(time.Second), mbgo.Imposter{
+					Port:  8080,
+					Proto: "tcp",
+					Name:  "overwrite_all_stubs_test",
+					Stubs: []mbgo.Stub{
+						{
+							Predicates: []mbgo.Predicate{
+								{
+									Operator: "endsWith",
+									Request: mbgo.TCPRequest{
+										Data: "SGVsbG8sIHdvcmxkIQ==",
+									},
+								},
+							},
+							Responses: []mbgo.Response{
+								{
+									Type: "is",
+									Value: mbgo.TCPResponse{
+										Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+									},
+								},
+							},
+						},
+					},
+				})
+				assert.Equals(t, err, nil)
+			},
+			After: func(t *testing.T, client *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Expected: &mbgo.Imposter{
+				Port:  8080,
+				Proto: "tcp",
+				Name:  "overwrite_all_stubs_test",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "endsWith",
+								Request: mbgo.TCPRequest{
+									Data: "foo",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "bar",
+								},
+							},
+						},
+					},
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "endsWith",
+								Request: mbgo.TCPRequest{
+									Data: "bar",
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "baz",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, c := range cases {
+		c := c
+
+		t.Run(name, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(t, mb)
+			}
+
+			actual, err := mb.OverwriteAllStubs(newContext(time.Second), c.Port, c.Stubs)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(t, mb)
+			}
+		})
+	}
+}
+
+func TestClient_RemoveStub(t *testing.T) {
+	mb := newMountebankClient()
+
+	cases := map[string]struct {
+		Before func(*testing.T, *mbgo.Client)
+		After  func(*testing.T, *mbgo.Client)
+		Port   int
+		Index  int
+
+		// output expectations
+		Expected *mbgo.Imposter
+		Err      error
+	}{
+		"should error if an imposter does not exist on the specified port": {
+			Port: 8080,
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Err: errors.New("no such resource: Try POSTing to /imposters first?"),
+		},
+		"should error if the stub at the specified index does not exist": {
+			Port:  8080,
+			Index: 0,
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Create(newContext(time.Second), mbgo.Imposter{
+					Port:  8080,
+					Proto: "tcp",
+					Name:  "remove_stub_test",
+					Stubs: []mbgo.Stub{},
+				})
+				assert.Equals(t, err, nil)
+			},
+			After: func(t *testing.T, client *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Err: errors.New("bad data: 'stubIndex' must be a valid integer, representing the array index position of the stub to replace"),
+		},
+		"should remove the stub on the imposter if it exists": {
+			Port:  8080,
+			Index: 0,
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Create(newContext(time.Second), mbgo.Imposter{
+					Port:  8080,
+					Proto: "tcp",
+					Name:  "remove_stub_test",
+					Stubs: []mbgo.Stub{
+						{
+							Predicates: []mbgo.Predicate{
+								{
+									Operator: "endsWith",
+									Request: mbgo.TCPRequest{
+										Data: "SGVsbG8sIHdvcmxkIQ==",
+									},
+								},
+							},
+							Responses: []mbgo.Response{
+								{
+									Type: "is",
+									Value: mbgo.TCPResponse{
+										Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
+									},
+								},
+							},
+						},
+					},
+				})
+				assert.Equals(t, err, nil)
+			},
+			After: func(t *testing.T, client *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Expected: &mbgo.Imposter{
+				Port:  8080,
+				Proto: "tcp",
+				Name:  "remove_stub_test",
+				Stubs: nil,
+			},
+		},
+	}
+
+	for name, c := range cases {
+		c := c
+
+		t.Run(name, func(t *testing.T) {
+			if c.Before != nil {
+				c.Before(t, mb)
+			}
+
+			actual, err := mb.RemoveStub(newContext(time.Second), c.Port, c.Index)
+			assert.Equals(t, err, c.Err)
+			assert.Equals(t, actual, c.Expected)
+
+			if c.After != nil {
+				c.After(t, mb)
+			}
+		})
+	}
+}
+
 func TestClient_Delete(t *testing.T) {
 	mb := newMountebankClient()
 
@@ -361,13 +883,13 @@ func TestClient_DeleteRequests(t *testing.T) {
 		Err      error
 	}{
 		{
-			Description: "should return an empty Imposter struct if one is not configured on the specified port",
+			Description: "should error if one is not configured on the specified port",
 			Before: func(t *testing.T, mb *mbgo.Client) {
 				_, err := mb.Delete(newContext(time.Second), 8080, false)
 				assert.Equals(t, err, nil)
 			},
-			Port:     8080,
-			Expected: &mbgo.Imposter{},
+			Port: 8080,
+			Err:  errors.New("no such resource: Try POSTing to /imposters first?"),
 		},
 		{
 			Description: "should return the expected Imposter if it exists on successful deletion",
@@ -407,19 +929,21 @@ func TestClient_DeleteRequests(t *testing.T) {
 			actual, err := mb.DeleteRequests(newContext(time.Second), c.Port)
 			assert.Equals(t, err, c.Err)
 
-			for i := 0; i < len(actual.Requests); i++ {
-				req := actual.Requests[i].(mbgo.HTTPRequest)
-				ts := req.Timestamp
-				if len(ts) == 0 {
-					t.Errorf("expected non-empty timestamp in %v", req)
+			if actual != nil {
+				for i := 0; i < len(actual.Requests); i++ {
+					req := actual.Requests[i].(mbgo.HTTPRequest)
+					ts := req.Timestamp
+					if len(ts) == 0 {
+						t.Errorf("expected non-empty timestamp in %v", req)
+					}
+					// clear out the timestamp before doing a deep equality check
+					// see https://github.com/senseyeio/mbgo/pull/5 for details
+					req.Timestamp = ""
+					actual.Requests[i] = req
 				}
-				// clear out the timestamp before doing a deep equality check
-				// see https://github.com/senseyeio/mbgo/pull/5 for details
-				req.Timestamp = ""
-				actual.Requests[i] = req
-			}
 
-			assert.Equals(t, actual, c.Expected)
+				assert.Equals(t, actual, c.Expected)
+			}
 
 			if c.After != nil {
 				c.After(t, mb)
@@ -433,7 +957,7 @@ func TestClient_Config(t *testing.T) {
 
 	cfg, err := mb.Config(newContext(time.Second))
 	assert.Equals(t, err, nil)
-	assert.Equals(t, cfg.Version, "2.0.0")
+	assert.Equals(t, cfg.Version, "2.1.2")
 }
 
 func TestClient_Imposters(t *testing.T) {

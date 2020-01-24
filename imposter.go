@@ -515,6 +515,16 @@ type Stub struct {
 	Responses []Response
 }
 
+// MarshalJSON implements the json.Marshaler interface for Stub,
+// used to map a Stub value to its JSON structure.
+func (s Stub) MarshalJSON() ([]byte, error) {
+	dto, err := s.toDTO()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(dto)
+}
+
 // toDTO maps a Stub value to a stubDTO value; used for json.Marshal.
 func (s Stub) toDTO() (stubDTO, error) {
 	dto := stubDTO{
@@ -641,15 +651,7 @@ func (imp Imposter) MarshalJSON() ([]byte, error) {
 		m["recordRequests"] = imp.RecordRequests
 	}
 	if len(imp.Stubs) > 0 {
-		stubs := make([]stubDTO, len(imp.Stubs))
-		for i, stub := range imp.Stubs {
-			v, err := stub.toDTO()
-			if err != nil {
-				return nil, err
-			}
-			stubs[i] = v
-		}
-		m["stubs"] = stubs
+		m["stubs"] = imp.Stubs
 	}
 	if imp.AllowCORS {
 		m["allowCORS"] = imp.AllowCORS
