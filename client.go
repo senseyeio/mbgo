@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -212,7 +211,6 @@ func (cli *Client) OverwriteAllStubs(ctx context.Context, port int, stubs []Stub
 	b, err := json.Marshal(map[string]interface{}{
 		"stubs": stubs,
 	})
-	log.Printf("\ndto: %s\n", b)
 	if err != nil {
 		return nil, err
 	}
