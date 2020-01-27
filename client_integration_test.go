@@ -41,7 +41,8 @@ func TestClient_Logs(t *testing.T) {
 	assert.Equals(t, err, nil)
 	assert.Equals(t, len(vs) >= 2, true)
 	assert.Equals(t, vs[0].Message, "[mb:2525] mountebank v2.1.2 now taking orders - point your browser to http://localhost:2525/ for help")
-	assert.Equals(t, vs[1].Message, "[mb:2525] GET /logs")
+	assert.Equals(t, vs[1].Message, "[mb:2525] Running with --allowInjection set. See http://localhost:2525/docs/security for security info")
+	assert.Equals(t, vs[2].Message, "[mb:2525] GET /logs")
 }
 
 func TestClient_Create(t *testing.T) {
@@ -158,6 +159,63 @@ func TestClient_Create(t *testing.T) {
 										"Content-Type": {"application/json"},
 									},
 									Body: `{"test":true}`,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Description: "should support creation of javascript injection on predicates",
+			Input: mbgo.Imposter{
+				Proto: "tcp",
+				Port:  8080,
+				Name:  "create_test_predicate_javascript_injection",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "inject",
+								Request:  "request => { return Buffer.from(request.data, 'base64')[2] <= 100; }",
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "c2Vjb25kIHJlc3BvbnNl",
+								},
+							},
+						},
+					},
+				},
+			},
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			After: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.Equals(t, err, nil)
+			},
+			Expected: &mbgo.Imposter{
+				Proto: "tcp",
+				Port:  8080,
+				Name:  "create_test_predicate_javascript_injection",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "inject",
+								Request:  "request => { return Buffer.from(request.data, 'base64')[2] <= 100; }",
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "c2Vjb25kIHJlc3BvbnNl",
 								},
 							},
 						},

@@ -255,6 +255,8 @@ func (p Predicate) toDTO() (predicateDTO, error) {
 
 	var v interface{}
 	switch typ := p.Request.(type) {
+	case string:
+		v = typ
 	case HTTPRequest:
 		v = typ.toDTO()
 	case *HTTPRequest:
@@ -303,7 +305,20 @@ func (dto predicateDTO) unmarshalProto(proto string) (p Predicate, err error) {
 
 	for key, b := range dto {
 		p.Operator = key
-		p.Request, err = unmarshalRequest(proto, b)
+
+		switch key {
+		// Interpret the request as a string containing JavaScript if the
+		// inject operator is used.
+		case "inject":
+			var js string
+			err = json.Unmarshal(b, &js)
+			if err != nil {
+				return
+			}
+			p.Request = js
+		default:
+			p.Request, err = unmarshalRequest(proto, b)
+		}
 	}
 	return
 }

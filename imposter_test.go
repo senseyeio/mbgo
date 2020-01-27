@@ -354,6 +354,51 @@ func TestImposter_MarshalJSON(t *testing.T) {
 				},
 			},
 		},
+		{
+			Description: "should marshal the expected javascript injection predicate",
+			Imposter: mbgo.Imposter{
+				Proto: "tcp",
+				Port:  8080,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "inject",
+								Request:  "request => { return Buffer.from(request.data, 'base64')[2] <= 100; }",
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "c2Vjb25kIHJlc3BvbnNl",
+								},
+							},
+						},
+					},
+				},
+			},
+			Expected: map[string]interface{}{
+				"protocol": "tcp",
+				"port":     8080,
+				"stubs": []map[string]interface{}{
+					{
+						"predicates": []map[string]interface{}{
+							{
+								"inject": "request => { return Buffer.from(request.data, 'base64')[2] <= 100; }",
+							},
+						},
+						"responses": []map[string]interface{}{
+							{
+								"is": map[string]interface{}{
+									"data": "c2Vjb25kIHJlc3BvbnNl",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
