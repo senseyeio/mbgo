@@ -20,7 +20,7 @@ func TestClient_Do_Integration(t *testing.T) {
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// have a slow handler to make sure the request context times out
-			time.Sleep(timeout)
+			time.Sleep(timeout * 2)
 			w.WriteHeader(http.StatusNoContent)
 		}))
 		defer srv.Close()
@@ -30,16 +30,16 @@ func TestClient_Do_Integration(t *testing.T) {
 
 		cli := rest.NewClient(&http.Client{
 			// increase the old-style client timeout above context deadline
-			Timeout: timeout,
+			Timeout: timeout * 2,
 		}, u)
 
-		ctx, _ := context.WithTimeout(context.Background(), time.Millisecond)
+		ctx, _ := context.WithTimeout(context.Background(), timeout)
 		req, err := cli.NewRequest(ctx, http.MethodGet, "/foo", nil, nil)
 		assert.MustOk(t, err)
 
 		_, err = cli.Do(req)
 		urlErr, ok := err.(*url.Error)
 		assert.Equals(t, ok, true)
-		assert.Equals(t, urlErr.Err, context.DeadlineExceeded)
+		assert.Equals(t, context.DeadlineExceeded, urlErr.Err)
 	})
 }
