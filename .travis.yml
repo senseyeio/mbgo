@@ -6,15 +6,16 @@ services:
 language: go
 
 go:
-  - "1.10"
-  - "1.11"
-  - "1.12"
+  - "1.13"
+  - "1.14"
+  - "1.15"
+  - "1.16"
 
 script: make unit && make integration
 
 jobs:
   include:
     - stage: check
-      install: go get golang.org/x/lint/golint github.com/kisielk/errcheck
-      script: make lint && make errcheck
-      go: "1.12" # only run source code analysis tools on latest version of Go
+      install: go install golang.org/x/lint/golint@latest
+      script: make lint
+      go: "1.16" # only run source code analysis tools on latest version of Go

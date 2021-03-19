@@ -18,7 +18,6 @@ func TestImposter_MarshalJSON(t *testing.T) {
 		Description string
 		Imposter    mbgo.Imposter
 		Expected    map[string]interface{}
-		Err         error
 	}{
 		{
 			Description: "should marshal the tcp Imposter into the expected JSON",
@@ -354,6 +353,51 @@ func TestImposter_MarshalJSON(t *testing.T) {
 				},
 			},
 		},
+		{
+			Description: "should marshal the expected javascript injection predicate",
+			Imposter: mbgo.Imposter{
+				Proto: "tcp",
+				Port:  8080,
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "inject",
+								Request:  "request => { return Buffer.from(request.data, 'base64')[2] <= 100; }",
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.TCPResponse{
+									Data: "c2Vjb25kIHJlc3BvbnNl",
+								},
+							},
+						},
+					},
+				},
+			},
+			Expected: map[string]interface{}{
+				"protocol": "tcp",
+				"port":     8080,
+				"stubs": []map[string]interface{}{
+					{
+						"predicates": []map[string]interface{}{
+							{
+								"inject": "request => { return Buffer.from(request.data, 'base64')[2] <= 100; }",
+							},
+						},
+						"responses": []map[string]interface{}{
+							{
+								"is": map[string]interface{}{
+									"data": "c2Vjb25kIHJlc3BvbnNl",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -362,18 +406,21 @@ func TestImposter_MarshalJSON(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			t.Parallel()
 
-			ab, err := json.Marshal(c.Imposter)
-			assert.Equals(t, err, c.Err)
-			eb, err := json.Marshal(c.Expected)
-			assert.Equals(t, err, nil)
+			// verify JSON structure of expected value versus actual
+			actualBytes, err := json.Marshal(c.Imposter)
+			assert.MustOk(t, err)
+
+			expectedBytes, err := json.Marshal(c.Expected)
+			assert.MustOk(t, err)
 
 			var actual, expected map[string]interface{}
-			err = json.Unmarshal(ab, &actual)
-			assert.Equals(t, err, nil)
-			err = json.Unmarshal(eb, &expected)
-			assert.Equals(t, err, nil)
+			err = json.Unmarshal(actualBytes, &actual)
+			assert.MustOk(t, err)
 
-			assert.Equals(t, actual, expected)
+			err = json.Unmarshal(expectedBytes, &expected)
+			assert.MustOk(t, err)
+
+			assert.Equals(t, expected, actual)
 		})
 	}
 }
@@ -383,7 +430,6 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 		Description string
 		JSON        map[string]interface{}
 		Expected    mbgo.Imposter
-		Err         error
 	}{
 		{
 			Description: "should unmarshal the JSON into the expected http Imposter",
@@ -531,15 +577,13 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			t.Parallel()
 
-			b, err := json.Marshal(c.JSON)
-			if err != nil {
-				t.Fatal(err)
-			}
+			actualBytes, err := json.Marshal(c.JSON)
+			assert.MustOk(t, err)
 
 			actual := mbgo.Imposter{}
-			err = json.Unmarshal(b, &actual)
-			assert.Equals(t, err, c.Err)
-			assert.Equals(t, actual, c.Expected)
+			err = json.Unmarshal(actualBytes, &actual)
+			assert.MustOk(t, err)
+			assert.Equals(t, c.Expected, actual)
 		})
 	}
 }

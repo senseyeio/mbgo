@@ -129,6 +129,141 @@ func (cli *Client) Imposter(ctx context.Context, port int, replay bool) (*Impost
 	return &imp, nil
 }
 
+// AddStub adds a new Stub without restarting its Imposter given the imposter's
+// port and the new stub's index, or simply to the end of the array if index < 0.
+//
+// See more information about this resource at:
+// http://www.mbtest.org/docs/api/overview#add-stub
+func (cli *Client) AddStub(ctx context.Context, port, index int, stub Stub) (*Imposter, error) {
+	p := fmt.Sprintf("/imposters/%d/stubs", port)
+
+	dto := map[string]interface{}{"stub": stub}
+	if index >= 0 {
+		dto["index"] = index
+	}
+	b, err := json.Marshal(dto)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := cli.restCli.NewRequest(ctx, http.MethodPost, p, bytes.NewReader(b), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var imp Imposter
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
+	}
+	return &imp, nil
+}
+
+// OverwriteStub overwrites an existing Stub without restarting its Imposter,
+// where the stub index denotes the stub to be changed.
+//
+// See more information about this resouce at:
+// http://www.mbtest.org/docs/api/overview#change-stub
+func (cli *Client) OverwriteStub(ctx context.Context, port, index int, stub Stub) (*Imposter, error) {
+	p := fmt.Sprintf("/imposters/%d/stubs/%d", port, index)
+
+	b, err := json.Marshal(stub)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := cli.restCli.NewRequest(ctx, http.MethodPut, p, bytes.NewReader(b), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var imp Imposter
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
+	}
+	return &imp, nil
+}
+
+// OverwriteAllStubs overwrites all existing Stubs without restarting their Imposter.
+//
+// See more information about this resource at:
+// http://www.mbtest.org/docs/api/overview#change-stubs
+func (cli *Client) OverwriteAllStubs(ctx context.Context, port int, stubs []Stub) (*Imposter, error) {
+	p := fmt.Sprintf("/imposters/%d/stubs", port)
+
+	b, err := json.Marshal(map[string]interface{}{
+		"stubs": stubs,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := cli.restCli.NewRequest(ctx, http.MethodPut, p, bytes.NewReader(b), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var imp Imposter
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
+	}
+	return &imp, nil
+}
+
+// RemoveStub removes a Stub without restarting its Imposter.
+//
+// See more information about this resource at:
+// http://www.mbtest.org/docs/api/overview#delete-stub
+func (cli *Client) RemoveStub(ctx context.Context, port, index int) (*Imposter, error) {
+	p := fmt.Sprintf("/imposters/%d/stubs/%d", port, index)
+
+	req, err := cli.restCli.NewRequest(ctx, http.MethodDelete, p, http.NoBody, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cli.restCli.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var imp Imposter
+	if resp.StatusCode == http.StatusOK {
+		if err := cli.restCli.DecodeResponseBody(resp.Body, &imp); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, cli.decodeError(resp.Body)
+	}
+	return &imp, nil
+}
+
 // Delete removes an Imposter configured on the given port and returns
 // the deleted Imposter data, or an empty Imposter struct if one does not
 // exist on the port.
@@ -169,7 +304,7 @@ func (cli *Client) Delete(ctx context.Context, port int, replay bool) (*Imposter
 // See more information about this resource at:
 // http://www.mbtest.org/docs/api/overview#delete-imposter-requests.
 func (cli *Client) DeleteRequests(ctx context.Context, port int) (*Imposter, error) {
-	p := fmt.Sprintf("/imposters/%d/requests", port)
+	p := fmt.Sprintf("/imposters/%d/savedProxyResponses", port)
 
 	req, err := cli.restCli.NewRequest(ctx, http.MethodDelete, p, nil, nil)
 	if err != nil {

@@ -1,6 +1,7 @@
 // Copyright (c) 2018 Senseye Ltd. All rights reserved.
 // Use of this source code is governed by the MIT License that can be found in the LICENSE file.
 
+// Package rest is used internally by the client to interact with the mountebank API.
 package rest
 
 import (

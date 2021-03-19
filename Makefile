@@ -1,24 +1,32 @@
-GOPACKAGES := $(shell go list ./...)
+PACKAGES := $(shell go list ./... | grep -v mock)
 
 .PHONY: default
-default: fmt lint unit
-
-.PHONY: errcheck
-errcheck:
-	@errcheck -asserts -blank -ignore 'io:[cC]lose' $(GOPACKAGES)
+default: fmt lint
 
 .PHONY: fmt
+## fmt: runs go fmt on source files
 fmt:
 	@go fmt $(PACKAGES)
 
+.PHONY: help
+## help: prints this help message
+help:
+	@echo "Usage: \n"
+	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
+
 .PHONY: integration
+## integration: runs the integration tests
 integration:
-	@sh ./scripts/integration_test.sh $(GOPACKAGES)
+	@go clean -testcache
+	@sh ./scripts/integration_test.sh $(PACKAGES)
 
 .PHONY: lint
+## lint: runs go lint on source files
 lint:
-	@golint -set_exit_status $(GOPACKAGES)
+	@golint -set_exit_status -min_confidence=0.3 $(PACKAGES)
 
 .PHONY: unit
+## unit: runs the unit tests
 unit:
-	@go test -cover -timeout=1s $(GOPACKAGES)
+	@go clean -testcache
+	@go test -cover -covermode=atomic -race -timeout=1s $(PACKAGES)
