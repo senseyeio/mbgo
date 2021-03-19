@@ -8,7 +8,7 @@ docker run -d --rm --name=mountebank_test -p 2525:2525 -p 8080:8080 -p 8081:8081
     andyrbell/mountebank:2.1.2 mb --allowInjection
 
 # run integration tests and record exit code
-go test -cover -tags=integration -timeout=5s ${PACKAGES}
+go test -cover -covermode=atomic -race -run=^*_Integration$ -tags=integration -timeout=5s ${PACKAGES}
 CODE=$?
 
 # always stop the mountebank container, even on failures

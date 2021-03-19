@@ -42,7 +42,7 @@ func TestClient_NewRequest(t *testing.T) {
 			Root:        &url.URL{},
 			Method:      "bad method",
 			AssertFunc: func(t *testing.T, _ *http.Request, err error) {
-				assert.Equals(t, err, errors.New(`net/http: invalid method "bad method"`))
+				assert.Equals(t, errors.New(`net/http: invalid method "bad method"`), err)
 			},
 		},
 		{
@@ -72,7 +72,7 @@ func TestClient_NewRequest(t *testing.T) {
 					ProtoMinor: 1,
 					Header:     http.Header{"Accept": []string{"application/json"}},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.Background()))
+				assert.Equals(t, expected.WithContext(context.Background()), actual)
 			},
 		},
 		{
@@ -89,7 +89,7 @@ func TestClient_NewRequest(t *testing.T) {
 					ProtoMinor: 1,
 					Header:     http.Header{"Accept": []string{"application/json"}},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.Background()))
+				assert.Equals(t, expected.WithContext(context.Background()), actual)
 			},
 		},
 		{
@@ -106,7 +106,7 @@ func TestClient_NewRequest(t *testing.T) {
 					ProtoMinor: 1,
 					Header:     http.Header{"Accept": []string{"application/json"}},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.Background()))
+				assert.Equals(t, expected.WithContext(context.Background()), actual)
 			},
 		},
 		{
@@ -126,7 +126,7 @@ func TestClient_NewRequest(t *testing.T) {
 						"Content-Type": []string{"application/json"},
 					},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.Background()))
+				assert.Equals(t, expected.WithContext(context.Background()), actual)
 			},
 		},
 		{
@@ -146,7 +146,7 @@ func TestClient_NewRequest(t *testing.T) {
 						"Content-Type": []string{"application/json"},
 					},
 				}
-				assert.Equals(t, actual, expected.WithContext(context.Background()))
+				assert.Equals(t, expected.WithContext(context.Background()), actual)
 			},
 		},
 	}
@@ -212,8 +212,12 @@ func TestClient_DecodeResponseBody(t *testing.T) {
 
 			cli := rest.NewClient(nil, nil)
 			err := cli.DecodeResponseBody(c.Body, c.Value)
-			assert.Equals(t, err, c.Err)
-			assert.Equals(t, c.Value, c.Expected)
+			if c.Err != nil {
+				assert.Equals(t, c.Err, err)
+			} else {
+				assert.Ok(t, err)
+			}
+			assert.Equals(t, c.Expected, c.Value)
 		})
 	}
 }
