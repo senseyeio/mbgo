@@ -1,6 +1,7 @@
 // Copyright (c) 2018 Senseye Ltd. All rights reserved.
 // Use of this source code is governed by the MIT License that can be found in the LICENSE file.
 
+//go:build integration
 // +build integration
 
 package mbgo_test
@@ -138,7 +139,7 @@ func TestClient_Create_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "equals",
-								Request: mbgo.HTTPRequest{
+								Request: &mbgo.HTTPRequest{
 									Method: http.MethodGet,
 									Path:   "/foo",
 									Query: map[string][]string{
@@ -153,7 +154,7 @@ func TestClient_Create_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.HTTPResponse{
+								Value: &mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
 									Headers: map[string][]string{
 										"Content-Type": {"application/json"},
@@ -214,7 +215,7 @@ func TestClient_Create_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "c2Vjb25kIHJlc3BvbnNl",
 								},
 							},
@@ -325,7 +326,7 @@ func TestClient_Imposter_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "SGVsbG8sIHdvcmxkIQ==",
 								},
 							},
@@ -333,7 +334,7 @@ func TestClient_Imposter_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
 								},
 							},
@@ -449,7 +450,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "foo",
 								},
 							},
@@ -457,7 +458,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "bar",
 								},
 							},
@@ -467,7 +468,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "SGVsbG8sIHdvcmxkIQ==",
 								},
 							},
@@ -475,7 +476,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
 								},
 							},
@@ -593,7 +594,7 @@ func TestClient_OverwriteStub_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "foo",
 								},
 							},
@@ -601,7 +602,7 @@ func TestClient_OverwriteStub_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "bar",
 								},
 							},
@@ -737,7 +738,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "foo",
 								},
 							},
@@ -745,7 +746,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "bar",
 								},
 							},
@@ -755,7 +756,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "bar",
 								},
 							},
@@ -763,7 +764,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "baz",
 								},
 							},

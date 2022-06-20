@@ -13,6 +13,22 @@ import (
 	"github.com/senseyeio/mbgo/internal/assert"
 )
 
+type duplex interface {
+	json.Marshaler
+	json.Unmarshaler
+}
+
+var (
+	_ duplex = &mbgo.HTTPRequest{}
+	_ duplex = &mbgo.HTTPResponse{}
+	_ duplex = &mbgo.TCPRequest{}
+	_ duplex = &mbgo.TCPResponse{}
+	_ duplex = &mbgo.Predicate{}
+	_ duplex = &mbgo.Response{}
+	_ duplex = &mbgo.Stub{}
+	_ duplex = &mbgo.Imposter{}
+)
+
 func TestImposter_MarshalJSON(t *testing.T) {
 	cases := []struct {
 		Description string
@@ -482,7 +498,7 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "equals",
-								Request: mbgo.HTTPRequest{
+								Request: &mbgo.HTTPRequest{
 									RequestFrom: net.IPv4(172, 17, 0, 1),
 									Method:      "POST",
 									Path:        "/foo",
@@ -499,7 +515,7 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.HTTPResponse{
+								Value: &mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
 									Mode:       "text",
 									Headers: map[string][]string{
@@ -551,7 +567,7 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "equals",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									RequestFrom: net.IPv4(172, 17, 0, 1),
 									Data:        "SGVsbG8sIHdvcmxkIQ==",
 								},
@@ -560,7 +576,7 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
 								},
 							},
