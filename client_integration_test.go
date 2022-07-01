@@ -1,6 +1,7 @@
 // Copyright (c) 2018 Senseye Ltd. All rights reserved.
 // Use of this source code is governed by the MIT License that can be found in the LICENSE file.
 
+//go:build integration
 // +build integration
 
 package mbgo_test
@@ -138,7 +139,7 @@ func TestClient_Create_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "equals",
-								Request: mbgo.HTTPRequest{
+								Request: &mbgo.HTTPRequest{
 									Method: http.MethodGet,
 									Path:   "/foo",
 									Query: map[string][]string{
@@ -153,7 +154,7 @@ func TestClient_Create_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.HTTPResponse{
+								Value: &mbgo.HTTPResponse{
 									StatusCode: http.StatusOK,
 									Headers: map[string][]string{
 										"Content-Type": {"application/json"},
@@ -214,8 +215,131 @@ func TestClient_Create_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "c2Vjb25kIHJlc3BvbnNl",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Description: "should support nested logical predicates",
+			Input: mbgo.Imposter{
+				Proto: "http",
+				Port:  8080,
+				Name:  "create_test_predicate_nested_logical",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "or",
+								Request: []mbgo.Predicate{
+									{
+										Operator: "equals",
+										Request: mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/foo",
+										},
+									},
+									{
+										Operator: "equals",
+										Request: mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/bar",
+										},
+									},
+									{
+										Operator: "and",
+										Request: []mbgo.Predicate{
+											{
+												Operator: "equals",
+												Request: mbgo.HTTPRequest{
+													Method: http.MethodPost,
+													Path:   "/baz",
+												},
+											},
+											{
+												Operator: "equals",
+												Request: mbgo.HTTPRequest{
+													Body: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+								},
+							},
+						},
+					},
+				},
+			},
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.MustOk(t, err)
+			},
+			After: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.MustOk(t, err)
+			},
+			Expected: &mbgo.Imposter{
+				Proto: "http",
+				Port:  8080,
+				Name:  "create_test_predicate_nested_logical",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "or",
+								Request: []mbgo.Predicate{
+									{
+										Operator: "equals",
+										Request: &mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/foo",
+										},
+									},
+									{
+										Operator: "equals",
+										Request: &mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/bar",
+										},
+									},
+									{
+										Operator: "and",
+										Request: []mbgo.Predicate{
+											{
+												Operator: "equals",
+												Request: &mbgo.HTTPRequest{
+													Method: http.MethodPost,
+													Path:   "/baz",
+												},
+											},
+											{
+												Operator: "equals",
+												Request: &mbgo.HTTPRequest{
+													Body: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: &mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
 								},
 							},
 						},
@@ -325,7 +449,7 @@ func TestClient_Imposter_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "SGVsbG8sIHdvcmxkIQ==",
 								},
 							},
@@ -333,7 +457,7 @@ func TestClient_Imposter_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
 								},
 							},
@@ -449,7 +573,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "foo",
 								},
 							},
@@ -457,7 +581,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "bar",
 								},
 							},
@@ -467,7 +591,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "SGVsbG8sIHdvcmxkIQ==",
 								},
 							},
@@ -475,7 +599,7 @@ func TestClient_AddStub_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "Z2l0aHViLmNvbS9zZW5zZXllaW8vbWJnbw==",
 								},
 							},
@@ -593,7 +717,7 @@ func TestClient_OverwriteStub_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "foo",
 								},
 							},
@@ -601,7 +725,7 @@ func TestClient_OverwriteStub_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "bar",
 								},
 							},
@@ -737,7 +861,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "foo",
 								},
 							},
@@ -745,7 +869,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "bar",
 								},
 							},
@@ -755,7 +879,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Predicates: []mbgo.Predicate{
 							{
 								Operator: "endsWith",
-								Request: mbgo.TCPRequest{
+								Request: &mbgo.TCPRequest{
 									Data: "bar",
 								},
 							},
@@ -763,7 +887,7 @@ func TestClient_OverwriteAllStubs_Integration(t *testing.T) {
 						Responses: []mbgo.Response{
 							{
 								Type: "is",
-								Value: mbgo.TCPResponse{
+								Value: &mbgo.TCPResponse{
 									Data: "baz",
 								},
 							},

@@ -7,7 +7,7 @@ A mountebank API client for the Go programming language.
 ## Installation
 
 ```sh
-$ go get -u github.com/senseyeio/mbgo
+go get -u github.com/senseyeio/mbgo@latest
 ```
 
 ## Testing
@@ -15,8 +15,8 @@ $ go get -u github.com/senseyeio/mbgo
 This package includes both unit and integration tests. Use the `unit` and `integration` targets in the Makefile to run them, respectively:
 
 ```sh
-$ make unit
-$ make integration
+make unit
+make integration
 ```
 
 The integration tests expect Docker to be available on the host, using it to run a local mountebank container at 
