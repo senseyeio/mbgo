@@ -224,6 +224,129 @@ func TestClient_Create_Integration(t *testing.T) {
 				},
 			},
 		},
+		{
+			Description: "should support nested logical predicates",
+			Input: mbgo.Imposter{
+				Proto: "http",
+				Port:  8080,
+				Name:  "create_test_predicate_nested_logical",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "or",
+								Request: []mbgo.Predicate{
+									{
+										Operator: "equals",
+										Request: mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/foo",
+										},
+									},
+									{
+										Operator: "equals",
+										Request: mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/bar",
+										},
+									},
+									{
+										Operator: "and",
+										Request: []mbgo.Predicate{
+											{
+												Operator: "equals",
+												Request: mbgo.HTTPRequest{
+													Method: http.MethodPost,
+													Path:   "/baz",
+												},
+											},
+											{
+												Operator: "equals",
+												Request: mbgo.HTTPRequest{
+													Body: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+								},
+							},
+						},
+					},
+				},
+			},
+			Before: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.MustOk(t, err)
+			},
+			After: func(t *testing.T, mb *mbgo.Client) {
+				_, err := mb.Delete(newContext(time.Second), 8080, false)
+				assert.MustOk(t, err)
+			},
+			Expected: &mbgo.Imposter{
+				Proto: "http",
+				Port:  8080,
+				Name:  "create_test_predicate_nested_logical",
+				Stubs: []mbgo.Stub{
+					{
+						Predicates: []mbgo.Predicate{
+							{
+								Operator: "or",
+								Request: []mbgo.Predicate{
+									{
+										Operator: "equals",
+										Request: &mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/foo",
+										},
+									},
+									{
+										Operator: "equals",
+										Request: &mbgo.HTTPRequest{
+											Method: http.MethodPost,
+											Path:   "/bar",
+										},
+									},
+									{
+										Operator: "and",
+										Request: []mbgo.Predicate{
+											{
+												Operator: "equals",
+												Request: &mbgo.HTTPRequest{
+													Method: http.MethodPost,
+													Path:   "/baz",
+												},
+											},
+											{
+												Operator: "equals",
+												Request: &mbgo.HTTPRequest{
+													Body: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Responses: []mbgo.Response{
+							{
+								Type: "is",
+								Value: &mbgo.HTTPResponse{
+									StatusCode: http.StatusOK,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {

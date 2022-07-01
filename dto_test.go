@@ -29,6 +29,184 @@ var (
 	_ duplex = &mbgo.Imposter{}
 )
 
+func TestPredicate_MarshalJSON(t *testing.T) {
+	cases := map[string]struct {
+		predicate mbgo.Predicate
+		want      map[string]interface{}
+	}{
+		"contains request": {
+			predicate: mbgo.Predicate{
+				Operator: "is",
+				Request: mbgo.HTTPRequest{
+					Method: http.MethodGet,
+				},
+			},
+			want: map[string]interface{}{
+				"is": map[string]interface{}{
+					"method": http.MethodGet,
+				},
+			},
+		},
+		"contains nested predicate": {
+			predicate: mbgo.Predicate{
+				Operator: "not",
+				Request: mbgo.Predicate{
+					Operator: "is",
+					Request: mbgo.HTTPRequest{
+						Method: http.MethodGet,
+					},
+				},
+			},
+			want: map[string]interface{}{
+				"not": map[string]interface{}{
+					"is": map[string]interface{}{
+						"method": http.MethodGet,
+					},
+				},
+			},
+		},
+		"contains nested predicate collection": {
+			predicate: mbgo.Predicate{
+				Operator: "or",
+				Request: []mbgo.Predicate{
+					{
+						Operator: "is",
+						Request: mbgo.HTTPRequest{
+							Method: http.MethodGet,
+						},
+					},
+					{
+						Operator: "is",
+						Request: mbgo.HTTPRequest{
+							Body: "foo",
+						},
+					},
+				},
+			},
+			want: map[string]interface{}{
+				"or": []map[string]interface{}{
+					{
+						"is": map[string]interface{}{
+							"method": http.MethodGet,
+						},
+					},
+					{
+						"is": map[string]interface{}{
+							"body": "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, c := range cases {
+		c := c
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// verify JSON structure of expected value versus actual
+			actualBytes, err := json.Marshal(c.predicate)
+			assert.MustOk(t, err)
+
+			expectedBytes, err := json.Marshal(c.want)
+			assert.MustOk(t, err)
+
+			var actual, expected map[string]interface{}
+			err = json.Unmarshal(actualBytes, &actual)
+			assert.MustOk(t, err)
+
+			err = json.Unmarshal(expectedBytes, &expected)
+			assert.MustOk(t, err)
+
+			assert.Equals(t, expected, actual)
+		})
+	}
+}
+
+func TestPredicate_UnmarshalJSON(t *testing.T) {
+	cases := map[string]struct {
+		want mbgo.Predicate
+		json map[string]interface{}
+	}{
+		"contains request": {
+			json: map[string]interface{}{
+				"is": map[string]interface{}{
+					"method": http.MethodGet,
+				},
+			},
+			want: mbgo.Predicate{
+				Operator: "is",
+				Request:  json.RawMessage(`{"method":"GET"}`),
+			},
+		},
+		"contains nested predicate": {
+			json: map[string]interface{}{
+				"not": map[string]interface{}{
+					"is": map[string]interface{}{
+						"method": http.MethodGet,
+					},
+				},
+			},
+			want: mbgo.Predicate{
+				Operator: "not",
+				Request: mbgo.Predicate{
+					Operator: "is",
+					Request:  json.RawMessage(`{"method":"GET"}`),
+				},
+			},
+		},
+		"contains nested predicate collection": {
+			json: map[string]interface{}{
+				"or": []map[string]interface{}{
+					{
+						"is": map[string]interface{}{
+							"method": http.MethodGet,
+						},
+					},
+					{
+						"is": map[string]interface{}{
+							"body": "foo",
+						},
+					},
+				},
+			},
+			want: mbgo.Predicate{
+				Operator: "or",
+				Request: []mbgo.Predicate{
+					{
+						Operator: "is",
+						Request:  json.RawMessage(`{"method":"GET"}`),
+					},
+					{
+						Operator: "is",
+						Request:  json.RawMessage(`{"body":"foo"}`),
+					},
+				},
+			},
+		},
+	}
+
+	for name, c := range cases {
+		c := c
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			b, err := json.Marshal(c.json)
+			assert.MustOk(t, err)
+
+			var got mbgo.Predicate
+			err = json.Unmarshal(b, &got)
+			assert.MustOk(t, err)
+
+			// verify unmarshaled predicate versus expected
+			assert.Equals(t, c.want, got)
+		})
+	}
+}
+
 func TestImposter_MarshalJSON(t *testing.T) {
 	cases := []struct {
 		Description string

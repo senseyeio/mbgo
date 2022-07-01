@@ -24,6 +24,10 @@ func parseClientSocket(s string) (ip net.IP, err error) {
 }
 
 func toMapValues(q map[string][]string) map[string]interface{} {
+	if q == nil {
+		return nil
+	}
+
 	out := make(map[string]interface{}, len(q))
 
 	for k, ss := range q {
@@ -40,6 +44,10 @@ func toMapValues(q map[string][]string) map[string]interface{} {
 }
 
 func fromMapValues(q map[string]interface{}) (map[string][]string, error) {
+	if q == nil {
+		return nil, nil
+	}
+
 	out := make(map[string][]string, len(q))
 
 	for k, v := range q {
@@ -237,12 +245,29 @@ func (p Predicate) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 		dto[p.Operator] = b
+
+	case []Predicate:
+		preds := make([]json.RawMessage, len(t))
+		for i, sub := range t {
+			b, err := sub.MarshalJSON()
+			if err != nil {
+				return nil, err
+			}
+			preds[i] = b
+		}
+		b, err := json.Marshal(preds)
+		if err != nil {
+			return nil, err
+		}
+		dto[p.Operator] = b
+
 	case string:
 		b, err := json.Marshal(t)
 		if err != nil {
 			return nil, err
 		}
 		dto[p.Operator] = b
+
 	default:
 		return nil, fmt.Errorf("unsupported predicate request type: %v",
 			reflect.TypeOf(t).String())
@@ -312,11 +337,23 @@ func (p *Predicate) UnmarshalJSON(b []byte) error {
 			}
 			p.Request = js
 
-		// TODO: slice of predicates
-		//case "and", "or":
+		// Slice of predicates
+		case "and", "or":
+			var ps []Predicate
+			err = json.Unmarshal(b, &ps)
+			if err != nil {
+				return err
+			}
+			p.Request = ps
 
-		// TODO: single predicate
-		//case "not":
+		// Single predicate
+		case "not":
+			var v Predicate
+			err = json.Unmarshal(b, &v)
+			if err != nil {
+				return err
+			}
+			p.Request = v
 
 		// Otherwise we have a request object.
 		default:
@@ -475,6 +512,32 @@ func getRequestUnmarshaler(proto string) (json.Unmarshaler, error) {
 	return um, nil
 }
 
+func unmarshalPredicateRecurse(proto string, p *Predicate) error {
+	switch v := p.Request.(type) {
+	case json.RawMessage:
+		um, err := getRequestUnmarshaler(proto)
+		if err != nil {
+			return err
+		}
+		if err = um.UnmarshalJSON(v); err != nil {
+			return err
+		}
+		p.Request = um
+
+	case Predicate:
+		if err := unmarshalPredicateRecurse(proto, &v); err != nil {
+			return err
+		}
+	case []Predicate:
+		for i := range v {
+			if err := unmarshalPredicateRecurse(proto, &v[i]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func getResponseUnmarshaler(proto string) (json.Unmarshaler, error) {
 	var um json.Unmarshaler
 	switch proto {
@@ -510,17 +573,10 @@ func (imp *Imposter) UnmarshalJSON(b []byte) error {
 				return err
 			}
 
-			for i, p := range s.Predicates {
-				if raw, ok := p.Request.(json.RawMessage); ok {
-					um, err := getRequestUnmarshaler(imp.Proto)
-					if err != nil {
-						return err
-					}
-					err = um.UnmarshalJSON(raw)
-					if err != nil {
-						return err
-					}
-					s.Predicates[i].Request = um
+			for i := range s.Predicates {
+				err = unmarshalPredicateRecurse(imp.Proto, &s.Predicates[i])
+				if err != nil {
+					return err
 				}
 			}
 
