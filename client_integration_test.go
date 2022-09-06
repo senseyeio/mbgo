@@ -41,8 +41,8 @@ func TestClient_Logs_Integration(t *testing.T) {
 	vs, err := mb.Logs(newContext(time.Second), -1, -1)
 	assert.MustOk(t, err)
 	assert.Equals(t, true, len(vs) >= 2)
-	assert.Equals(t, "[mb:2525] mountebank v2.1.2 now taking orders - point your browser to http://localhost:2525/ for help", vs[0].Message)
-	assert.Equals(t, "[mb:2525] Running with --allowInjection set. See http://localhost:2525/docs/security for security info", vs[1].Message)
+	assert.Equals(t, "[mb:2525] Running with --allowInjection set. See http://localhost:2525/docs/security for security info", vs[0].Message)
+	assert.Equals(t, "[mb:2525] mountebank v2.7.0 now taking orders - point your browser to http://localhost:2525/ for help", vs[1].Message)
 	assert.Equals(t, "[mb:2525] GET /logs", vs[2].Message)
 }
 
@@ -1171,7 +1171,7 @@ func TestClient_Config_Integration(t *testing.T) {
 
 	cfg, err := mb.Config(newContext(time.Second))
 	assert.MustOk(t, err)
-	assert.Equals(t, "2.1.2", cfg.Version)
+	assert.Equals(t, "2.7.0", cfg.Version)
 }
 
 func TestClient_Imposters_Integration(t *testing.T) {
@@ -1270,11 +1270,13 @@ func TestClient_Imposters_Integration(t *testing.T) {
 				{
 					Port:         8080,
 					Proto:        "tcp",
+					Name:         "imposters_tcp_test",
 					RequestCount: 0,
 				},
 				{
 					Port:         8081,
 					Proto:        "http",
+					Name:         "imposters_http_test",
 					RequestCount: 0,
 				},
 			},
