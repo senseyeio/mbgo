@@ -661,6 +661,9 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 									},
 									"body": `{"response":true}`,
 								},
+								"_behaviors": map[string]interface{}{
+									"wait": 500,
+								},
 							},
 						},
 					},
@@ -701,6 +704,9 @@ func TestImposter_UnmarshalJSON(t *testing.T) {
 										"Content-Type": {"application/json"},
 									},
 									Body: `{"response":true}`,
+								},
+								Behaviors: &mbgo.Behaviors{
+									Wait: 500,
 								},
 							},
 						},
