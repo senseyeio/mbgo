@@ -406,11 +406,13 @@ func (r *Response) UnmarshalJSON(b []byte) error {
 	// Handle and delete behaviors from the DTO map before we check the
 	// type so that we can enforce only one type exists in the map.
 	if b, ok := dto[keyBehaviors]; ok {
-		err = json.Unmarshal(b, r.Behaviors)
+		behaviors := new(Behaviors)
+		err = json.Unmarshal(b, behaviors)
 		if err != nil {
 			return err
 		}
 		delete(dto, keyBehaviors)
+		r.Behaviors = behaviors
 	}
 
 	for key, b := range dto {
